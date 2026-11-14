@@ -197,6 +197,12 @@ textarea.code,input.code{font-family:var(--mono);font-size:13px}
 .fwtip h3{font-size:15px;margin:0 0 6px}.fwtip h3.warn{color:var(--warn,#F2C46B)}.fwtip h3.ok{color:var(--ok,#5FE3A5)}
 .fwtip pre{margin:8px 0;white-space:pre-wrap;word-break:break-all;font:12.5px/1.55 var(--mono);color:var(--ink);background:rgba(0,0,0,.25);border-radius:10px;padding:10px 12px}
 .fwtip details{margin-top:8px}.fwtip summary{cursor:pointer;color:var(--ink2);font-size:13px}
+.netgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media (max-width:760px){.netgrid{grid-template-columns:1fr}}
+.netgrid h3,#modalBody h3{font-size:15px;margin:14px 0 8px}
+.kv{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:10px;padding:5px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.05)}.kv>span:first-child{color:var(--ink2)}
+.naddr{font-family:var(--mono);font-size:12.5px;word-break:break-all;color:var(--ink)}
+svg.spark{width:100%;height:70px;background:var(--sunk);border-radius:10px}
+table.hops td{padding:5px 10px}
 pre.log{margin:0;white-space:pre-wrap;font:12.5px/1.6 var(--mono);color:var(--ink2);max-height:70vh;overflow:auto;background:var(--sunk);border-radius:12px;padding:12px 14px}
 
 /* modal */
@@ -359,6 +365,9 @@ ol.steps li::marker{font-weight:800;color:var(--acc)}
           <label class="f" for="pLan">Хто може відкрити цю панель</label>
           <select id="pLan"><option value="0">лише цей сервер</option><option value="1">уся локальна мережа</option></select>
           <small style="display:block;margin-top:6px;color:var(--mute)">Вхід обліковим записом Windows працює лише на самому сервері, щоб пароль не йшов мережею.</small>
+          <label class="f" for="pEmLan">Аварійний пароль з інших комп'ютерів</label>
+          <select id="pEmLan" onchange="saveEmLan()"><option value="0">заборонено</option><option value="1">дозволено</option></select>
+          <small style="display:block;margin-top:6px;color:var(--mute)">Панель працює без HTTPS: з іншого комп'ютера пароль іде мережею відкритим текстом, і його може перехопити будь-хто в цій мережі. Дозволяйте лише в довіреній мережі.</small><span id="emMsg"></span>
           <label class="f" for="pWeb">Порт панелі</label>
           <input id="pWeb" type="number" style="width:120px">
           <label class="f" for="pFirst">З якого номера давати порти новим принтерам</label>
@@ -447,6 +456,38 @@ addEventListener('popstate',e=>{if(!$('modal').classList.contains('hidden')&&!(e
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#shop-"]');if(!a)return;e.preventDefault();
   history.pushState(null,'',a.getAttribute('href'));route()});
 
+
+// ---------- network of a shop (0.17.0)
+const fmtMS=v=>{const u=(window.PR_LANG==='en')?' ms':' мс';return v<0?'—':(v<1?'<1'+u:Math.round(v)+u)};
+function spark(rt){if(rt.length<2)return'';const W=520,H=70,max=Math.max(...rt.map(x=>x.ms),1);
+  const pts=rt.map((x,i)=>`${(i/(rt.length-1)*W).toFixed(1)},${(H-4-(x.ms/max)*(H-10)).toFixed(1)}`).join(' ');
+  return`<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Відгук за останню годину"><polyline points="${pts}" fill="none" stroke="#40E0FF" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`}
+function ifaceList(list){return(list||[]).map(i=>`<div><span class="ink2">${esc(i.name)}:</span> <span class="naddr">${(i.addrs||[]).map(esc).join(', ')}</span></div>`).join('')||'<span class="ink2">—</span>'}
+function hopsTable(r){if(!r.hops||!r.hops.length)return'<p class="small ink2">Немає даних.</p>';
+  return`<p class="small ink2">До ${esc(r.target)}: переходів ${r.hops.length}.</p><div class="plain-wrap"><table class="plain hops"><tr><th>#</th><th>Адреса</th><th>Відгук</th></tr>${r.hops.map(h=>`<tr><td class="count">${h.n}</td><td class="naddr">${h.ip?esc(h.ip):'<span class="ink2">не відповідає</span>'}</td><td>${(h.ms||[]).map(fmtMS).join(' · ')}</td></tr>`).join('')}</table></div>`}
+async function openNet(a){
+  const n=(a.inventory&&a.inventory.net)||null,rt=a.rtt||[],v=rt.map(x=>x.ms);
+  const stat=v.length?`<span>Зараз</span> <b>${fmtMS(v[v.length-1])}</b> · <span>мін</span> <b>${fmtMS(Math.min(...v))}</b> · <span>сер</span> <b>${fmtMS(v.reduce((x,y)=>x+y,0)/v.length)}</b> · <span>макс</span> <b>${fmtMS(Math.max(...v))}</b>`:'<span>ще не виміряно</span>';
+  modal(modalHead('Мережа: '+esc(a.name),'shops')+`
+  <div class="netgrid">
+    <div><h3>Магазин</h3>
+      <div class="kv"><span>Зовнішня адреса (як бачить сервер)</span><b class="naddr">${a.seen_as?esc(a.seen_as):(a.online?esc(host(a.remote)):'—')}</b></div>
+      ${(a.seen||[]).length>1?`<div class="kv"><span>Раніше підключався з</span><span class="naddr">${a.seen.slice(0,-1).reverse().map(esc).join(', ')}</span></div>`:''}
+      <div class="kv"><span>Адреси в мережі магазину</span><div>${n?ifaceList(n.ifaces):'<span class="ink2">програма магазину старіша за 0.17.0</span>'}</div></div>
+      <div class="kv"><span>Роутер</span><span class="naddr">${n&&n.gateways&&n.gateways.length?n.gateways.map(esc).join(', '):'—'}</span></div>
+      <div class="kv"><span>Підключається до сервера за</span><span class="naddr">${n?esc(n.server_addr)+(n.server_ip?' → '+esc(n.server_ip):''):'—'}</span></div></div>
+    <div><h3>Сервер</h3><div id="srvNet" class="ink2">…</div></div>
+  </div>
+  <h3>Відгук</h3><p class="small ink2">Час відповіді по з'єднанню з магазином за останню годину, вимір раз на 30 с.</p><p class="small">${stat}</p>${spark(rt)}
+  <h3>Трасування маршруту</h3><p class="small ink2">Через які вузли йдуть дані. Займає до хвилини.</p>
+  <div class="row"><button id="trS" ${a.online?'':'disabled'}>Від сервера до магазину</button><button id="trP" ${a.online?'':'disabled'}>Від магазину до сервера</button></div>
+  <div id="trOut"></div>`);
+  api('GET','/api/netinfo').then(s=>{$('srvNet').classList.remove('ink2');$('srvNet').innerHTML=`<div class="kv"><span>Адреси сервера</span><div>${ifaceList(s.ifaces)}</div></div><div class="kv"><span>Зовнішня адреса в налаштуваннях</span><span class="naddr">${s.public?esc(s.public):'не вказано'}</span></div>`}).catch(()=>{});
+  const run=async(from,btn)=>{const o=$('trOut');btn.disabled=true;o.innerHTML='<p class="small ink2">Трасування йде…</p>';
+    try{const r=await api('POST','/api/agents/'+a.id+'/trace',{from});o.innerHTML=`<h3 style="font-size:14px">${from==='server'?'Від сервера до магазину':'Від магазину до сервера'}</h3>`+hopsTable(r)}
+    catch(e){o.innerHTML=`<p class="msg-bad">${esc(e.message)}</p>`}btn.disabled=false};
+  $('trS').onclick=e=>run('server',e.target);$('trP').onclick=e=>run('shop',e.target)}
+
 // ---------- modal
 function modal(html){$('modalBody').innerHTML=html;
   if($('modal').classList.contains('hidden')&&!(history.state&&history.state.modal))history.pushState({modal:1},'',location.href);
@@ -475,6 +516,7 @@ async function refresh(){
   $('ver').textContent='версія '+s.version;
   if(!touched.pub)$('pub').value=s.public_addr||'';
   if(!touched.ttl)$('ttl').value=s.job_ttl_minutes;
+  $('pEmLan').value=s.emergency_lan?'1':'0';
   if(!touched.ports){$('pAgent').value=s.ports.agent_port;$('pLan').value=s.ports.web_lan?'1':'0';$('pWeb').value=s.ports.web_port;$('pFirst').value=s.ports.first_port}
   if(!touched.allowed)$('allowed').value=(s.allowed||[]).join('\n');
   $('onlineFrom').textContent=(s.online_from||[]).length?'Зараз підключені: '+s.online_from.join(', '):'Зараз жоден магазин не підключений.';
@@ -575,6 +617,7 @@ function shopHTML(a,ai){
   const evs=(a.events||[]).slice().reverse();
   const meta=[];
   if(a.online)meta.push(`Комп'ютер ${esc(a.hostname)}, адреса ${esc(host(a.remote))}, програма ${esc(a.version)}.`);
+  const rt=(a.rtt||[]);if(a.online&&rt.length)meta.push(`Відгук: ${fmtMS(rt[rt.length-1].ms)}.`);
   if((a.allowed_ips||[]).length)meta.push(`Код діє лише з ${a.allowed_ips.map(esc).join(', ')}.`);
   if(a.code_expired)meta.push(`Код підключення протермінований: ним так і не скористались. Видайте новий (Ще → Видати новий код підключення).`);
   else if(valid(a.code_expires))meta.push(`Код підключення ще не використано, він діє до ${esc(when(a.code_expires))}.`);
@@ -588,6 +631,7 @@ function shopHTML(a,ai){
         ${jobs.length?`<span class="pill warn">${jobs.length} ${plural(jobs.length,'чек чекає','чеки чекають','чеків чекають')}</span>`:''}</div>
       <div class="shop-actions">
         ${a.online?`<button class="primary" data-act="add" data-a="${ai}">Додати принтер</button>`:''}
+        <button data-act="net" data-a="${ai}">Мережа</button>
         <details class="menu" data-key="menu-${esc(a.id)}"><summary>Ще</summary><div class="menu-list">
           <button data-act="rekey" data-a="${ai}">Видати новий код підключення</button>
           <button data-act="ip" data-a="${ai}">Прив'язати код до IP магазину</button>
@@ -595,7 +639,7 @@ function shopHTML(a,ai){
         </div></details>
       </div>
     </div>
-    ${meta.length?`<p class="shop-meta">${meta.join(' ')}</p>`:''}
+    ${meta.length?`<p class="shop-meta">${meta.map(x=>`<span>${x}</span>`).join(' ')}</p>`:''}
     ${printers.length?`<div class="tbl-wrap"><table class="routes"><colgroup><col class="c-srv"><col class="c-route"><col class="c-shop"><col class="c-conn"><col class="c-mode"><col><col class="c-act"></colgroup><thead><tr><th>Друк з програми</th><th></th><th>Друкує в магазині</th><th>Підключення</th><th>Що друкує</th><th>Стан</th><th></th></tr></thead><tbody>${printers.map((p,pi)=>rowHTML(a,ai,p,pi)).join('')}</tbody></table></div>`
       :`<div class="empty">${a.online?'Принтерів ще немає. Натисніть «Додати принтер», щоб видати принтер цього магазину.':'Принтерів ще немає. Їх можна буде додати, коли магазин підключиться.'}</div>`}
     ${evs.length||jobs.length?`<div class="shop-foot">
@@ -637,6 +681,7 @@ $('shops').addEventListener('click',async e=>{
   const a=AG[+b.dataset.a];const p=b.dataset.p!==undefined?a.printers[+b.dataset.p]:null;
   const m=b.closest('details.menu');if(m)m.open=false;
   try{switch(b.dataset.act){
+  case 'net':openNet(a);break;
   case 'aren':{const v=prompt('Нова назва магазину:',a.name);if(v)await api('POST','/api/agents/'+a.id+'/rename',{name:v});break}
   case 'rekey':if(confirm('Видати новий код для «'+a.name+'»? Старий одразу перестане діяти, і магазин відключиться, доки на ньому не вставлять новий.')){const j=await api('POST','/api/agents/'+a.id+'/rekey');
     modal(modalHead('Новий код для «'+esc(a.name)+'»')+codeBlock(j.code))}break;
@@ -784,6 +829,7 @@ async function loadFirewall(){let f;try{f=await api('GET','/api/firewall')}catch
   h+=`<details><summary>Повернути як було (будь-який порт і адреса)</summary>${cmd(f.revert,'fwRev')}</details>`;
   if(f.error&&f.rules.length===0&&!/Windows/.test(f.error))h+=`<p class="small ink2">Не вдалося прочитати правила: ${esc(f.error)}</p>`;
   box.className=cls;box.innerHTML=h}
+async function saveEmLan(){try{await api('POST','/api/emergency-lan',{on:$('pEmLan').value==='1'});flash('emMsg',true,'Збережено');refresh()}catch(e){flash('emMsg',false,e.message)}}
 async function saveAllowed(force){
   try{await api('POST','/api/allowed',{allowed:$('allowed').value,force:!!force});touched.allowed=false;flash('allowMsg',true,'Збережено');refresh();loadFirewall()}
   catch(e){if(e.status===409){if(confirm('Після збереження ВІДКЛЮЧАТЬСЯ ці магазини, бо їхніх адрес немає в списку:\n\n'+(e.data.would_drop||[]).join('\n')+'\n\nВсе одно зберегти?'))return saveAllowed(true);return}

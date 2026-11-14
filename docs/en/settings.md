@@ -147,6 +147,9 @@ printed after closing do not come out next morning.
 * **Who can open this panel** — only this server (default) or the whole local
   network. Windows sign-in still works only on the server itself; from the
   network only with the emergency password.
+* **Emergency password from other computers** — not allowed by default.
+  The panel has no HTTPS, so from the network the password travels in clear
+  text. Allow it only on a trusted network (since 0.17.0).
 * **Panel port** — 7330 by default. After a change the panel reopens at the
   new address.
 * **First port number for new printers** — 9101 by default. Each shop

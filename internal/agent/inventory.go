@@ -90,6 +90,7 @@ func (a *Agent) inventory() *proto.Inventory {
 	inv.Shared = append([]proto.Printer(nil), a.cfg.Shared...)
 	inv.Events = append([]proto.Event(nil), a.events...)
 	a.mu.Unlock()
+	inv.Net = a.netInfo()
 	return inv
 }
 

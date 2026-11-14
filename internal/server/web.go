@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -30,11 +31,15 @@ func (s *Server) routes() http.Handler {
 	})
 	m.HandleFunc("GET /api/hint", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
-		emergency := s.cfg.PasswordHash != ""
+		emergency := s.cfg.PasswordHash != "" && (s.cfg.EmergencyLAN || isLoopback(r))
 		s.mu.Unlock()
 		common.JSON(w, map[string]bool{"windows": winauth.Supported(), "emergency": emergency, "local": isLoopback(r)})
 	})
 	m.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-SD") != "1" { // a cross-site form cannot set it
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
 		who := s.loginKey(r)
 		if ok, wait := s.limiter.Allow(who); !ok {
 			common.JSONError(w, http.StatusTooManyRequests, fmt.Sprintf("забагато невдалих спроб — зачекайте %d с", int(wait.Seconds())+1))
@@ -46,6 +51,12 @@ func (s *Server) routes() http.Handler {
 			return
 		}
 		if strings.TrimSpace(in.User) == "" { // emergency panel password
+			// Over plain HTTP the password travels in clear text: from another
+			// computer only when the administrator allowed it (Settings).
+			if !isLoopback(r) && !s.emergencyLAN() {
+				common.JSONError(w, http.StatusForbidden, "аварійний пароль з мережі вимкнено — увійдіть на самому сервері або дозвольте його в налаштуваннях панелі")
+				return
+			}
 			if s.sessions.Login(w, in.Password) {
 				s.limiter.Reset(who)
 				s.Log.Printf("вхід у панель аварійним паролем")
@@ -79,6 +90,10 @@ func (s *Server) routes() http.Handler {
 		common.JSON(w, map[string]bool{"ok": true})
 	})
 	m.HandleFunc("POST /api/logout", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-SD") != "1" { // another site must not sign the admin out
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
 		if u := s.sessions.User(r); u != "" {
 			s.record(r, u, "вихід з панелі", "")
 		}
@@ -87,6 +102,37 @@ func (s *Server) routes() http.Handler {
 	})
 	m.HandleFunc("GET /api/state", g(func(w http.ResponseWriter, r *http.Request) {
 		common.JSON(w, s.StateIn(common.LangOf(w)))
+	}))
+	m.HandleFunc("POST /api/emergency-lan", g(func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ On bool }
+		if err := common.ReadBody(r, &in); err != nil {
+			common.JSONError(w, http.StatusBadRequest, "некоректний запит")
+			return
+		}
+		if err := s.SetEmergencyLAN(in.On); err != nil {
+			common.JSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.record(r, "", "аварійний пароль з мережі", fmt.Sprint(in.On))
+		common.JSON(w, map[string]bool{"ok": true})
+	}))
+	m.HandleFunc("GET /api/netinfo", g(func(w http.ResponseWriter, r *http.Request) {
+		common.JSON(w, s.NetInfo())
+	}))
+	m.HandleFunc("POST /api/agents/{id}/trace", g(func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ From string }
+		if err := common.ReadBody(r, &in); err != nil {
+			common.JSONError(w, http.StatusBadRequest, "некоректний запит")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), traceTimeout)
+		defer cancel()
+		res, err := s.Trace(ctx, r.PathValue("id"), in.From)
+		if err != nil {
+			common.JSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		common.JSON(w, res)
 	}))
 	m.HandleFunc("GET /api/firewall", g(func(w http.ResponseWriter, r *http.Request) {
 		common.JSON(w, s.Firewall())

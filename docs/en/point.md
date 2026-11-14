@@ -31,6 +31,14 @@ There is no password, because nothing can be changed here.
   renamed, a driver changed, a printer not responding, gone or back.
 * **Technical log** — for support.
 
+## Tabs
+
+**State** — the main thing, **Events** — what happened, **Network** — this
+computer's public address (as the server sees it), its addresses in the
+shop network, the router, the server and the response time, plus a "Trace"
+button for the route to the server. **Technical log** — for the
+administrator.
+
 ## The shop program looks after itself
 
 Every 15 seconds it checks the shared printers against Windows:

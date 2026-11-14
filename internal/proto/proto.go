@@ -105,6 +105,22 @@ type Inventory struct {
 	USBSeen  []string     `json:"usb_seen,omitempty"` // models Windows reports as connected
 	Shared   []Printer    `json:"shared"`
 	Events   []Event      `json:"events"`
+	Net      *NetInfo     `json:"net,omitempty"` // 0.17.0+
+}
+
+// NetInfo is where the point is on its own network (0.17.0). Its public
+// address is not here: the point cannot know it behind NAT; the server sees
+// it and sends it back in Welcome.SeenAs.
+type NetInfo struct {
+	Ifaces     []NetIface `json:"ifaces"`
+	Gateways   []string   `json:"gateways,omitempty"`
+	ServerAddr string     `json:"server_addr"`         // address from the code, as dialled
+	ServerIP   string     `json:"server_ip,omitempty"` // what that address led to
+}
+
+type NetIface struct {
+	Name  string   `json:"name"`
+	Addrs []string `json:"addrs"`
 }
 
 type InvPrinter struct {
@@ -159,6 +175,9 @@ type Welcome struct {
 	// Lang: the language the server writes its log in; the point writes
 	// its own log in the same one ("uk" or "en").
 	Lang string `json:"lang,omitempty"`
+	// SeenAs: the address the server sees this point connecting from, i.e.
+	// its public (NAT) address (0.17.0).
+	SeenAs string `json:"seen_as,omitempty"`
 }
 
 // Channels a point can use.

@@ -5,6 +5,7 @@ package agent
 // arrive over the same authenticated tunnel the point opened.
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -501,6 +502,10 @@ func (a *Agent) runCmd(cmd string, args json.RawMessage) (json.RawMessage, error
 			return nil, err
 		}
 		return nil, a.TestPort(in.Port)
+	case "traceroute":
+		ctx, cancel := context.WithTimeout(context.Background(), 80*time.Second)
+		defer cancel()
+		return a.traceToServer(ctx)
 	case "drivers":
 		if err := a.needAdmin(); err != nil {
 			return nil, err

@@ -47,8 +47,14 @@ A shop opens nothing to the internet: it connects to the server itself.
   accounts (`NT SERVICE\SlipDrukkaServer`, `NT SERVICE\SlipDrukkaAgent`),
   not as SYSTEM. A broken service cannot take over Windows.
 * **Panel sign-in.** Only an administrator of the server's Windows can sign
-  in to the admin panel. The shop page has no password, so it cannot
-  replace a working connection code.
+  in to the admin panel, and only on the server itself. The optional
+  emergency password is accepted from other computers only when Settings
+  allow it (off by default). The panel sends a Content-Security-Policy and
+  refuses requests from other sites. The shop page has no password, so it
+  cannot replace a working connection code.
+* **Releases** are built by GitHub Actions from the tag, with actions pinned
+  to commit SHAs; only the release step, run for tags, may write to the
+  repository.
 * **Optional:** CrowdSec rules (folder `crowdsec/`), and a firewall command
   in the panel (Settings) that narrows the program's rule to the shops port
   and the shops' addresses.
@@ -63,7 +69,22 @@ A shop opens nothing to the internet: it connects to the server itself.
   server's network settings.
 * **Installers are not signed.** Windows shows "Unknown publisher". Check
   the file against `SHA256SUMS` from the release.
+* **The connection code is the shop's key.** Whoever holds it can connect
+  as that shop (limit it to the shop's addresses to narrow this). Codes end
+  up in chats, on USB sticks and in verbose installer logs: if one may have
+  leaked, issue a new one in the panel (More → Issue a new connection code); the old one
+  stops working at once.
+* **The admin panel has no HTTPS.** On the server itself this does not
+  matter; from the network, the emergency password travels in clear text,
+  which is why that is off by default.
 * **Anyone signed in to the server can print** through its printer queues,
   as with any shared printer on that computer.
 * **Builds are not reproducible yet** (KNOWN-ISSUES.md).
-* **The code has not had an independent security audit.**
+* **The code has not had an independent security audit.** It was reviewed
+  by AI models (findings and fixes in KNOWN-ISSUES.md).
+
+## Planned
+
+* HTTPS for the admin panel when it is open to the network.
+* One-time connection codes: after the first connection the shop gets a
+  new long-term key, and the code itself stops working.

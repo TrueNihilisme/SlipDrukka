@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -31,11 +32,14 @@ import (
 )
 
 type Config struct {
-	Listen       string         `json:"listen"`      // where agents connect, e.g. ":7310"
-	Web          string         `json:"web"`         // admin page, e.g. "127.0.0.1:7330"
-	PublicAddr   string         `json:"public_addr"` // host:port written into codes
-	FirstPort    int            `json:"first_port"`  // first local RAW port
-	PasswordHash string         `json:"password_hash"`
+	Listen       string `json:"listen"`      // where agents connect, e.g. ":7310"
+	Web          string `json:"web"`         // admin page, e.g. "127.0.0.1:7330"
+	PublicAddr   string `json:"public_addr"` // host:port written into codes
+	FirstPort    int    `json:"first_port"`  // first local RAW port
+	PasswordHash string `json:"password_hash"`
+	// EmergencyLAN: the emergency password is accepted from other computers
+	// too (0.17.0). Off by default: over plain HTTP it travels in clear text.
+	EmergencyLAN bool           `json:"emergency_lan,omitempty"`
 	Agents       []*AgentConfig `json:"agents"`
 	Ports        map[string]int `json:"ports"` // "<agentID>/<alias>" -> local port
 	// Allowed: source addresses (IP or CIDR) points may connect from.
@@ -99,6 +103,42 @@ type agentConn struct {
 	sess                          *yamux.Session
 	inv                           *proto.Inventory // last report from the point
 	invAt                         time.Time
+	seenAs                        string      // public address as the server sees it
+	rtt                           []RTTSample // round trips over the connection, last hour (s.mu)
+}
+
+// RTTSample is one round trip to a point over its connection (yamux ping).
+type RTTSample struct {
+	At time.Time `json:"at"`
+	MS float64   `json:"ms"`
+}
+
+// RTTEvery and rttKeep: how often a point is pinged and how many samples are
+// kept (an hour).
+var (
+	RTTEvery = 30 * time.Second
+	rttKeep  = 120
+)
+
+// measureRTT pings the point over its connection until the session ends.
+func (s *Server) measureRTT(conn *agentConn) {
+	t := time.NewTicker(RTTEvery)
+	defer t.Stop()
+	for {
+		if d, err := conn.sess.Ping(); err == nil {
+			s.mu.Lock()
+			conn.rtt = append(conn.rtt, RTTSample{At: time.Now(), MS: float64(d.Microseconds()) / 1000})
+			if len(conn.rtt) > rttKeep {
+				conn.rtt = conn.rtt[len(conn.rtt)-rttKeep:]
+			}
+			s.mu.Unlock()
+		}
+		select {
+		case <-conn.sess.CloseChan():
+			return
+		case <-t.C:
+		}
+	}
 }
 
 type printerStats struct {
@@ -556,7 +596,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 	var ac *AgentConfig
 	h := common.SHA256Hex(hello.Key)
 	for _, a := range s.cfg.Agents {
-		if a.KeyHash == h {
+		if subtle.ConstantTimeCompare([]byte(a.KeyHash), []byte(h)) == 1 {
 			ac = a
 		}
 	}
@@ -609,7 +649,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 	wgPub := s.welcomeWGLocked()
 	s.mu.Unlock()
 	via := viaName(peer)
-	if err := proto.WriteLine(c, proto.Welcome{OK: true, Name: ac.Name, WireGuard: wgPub, Via: via, Lang: s.logLang()}); err != nil {
+	if err := proto.WriteLine(c, proto.Welcome{OK: true, Name: ac.Name, WireGuard: wgPub, Via: via, Lang: s.logLang(), SeenAs: ip.String()}); err != nil {
 		c.Close()
 		return
 	}
@@ -622,7 +662,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 		return
 	}
 	conn := &agentConn{id: ac.ID, remote: remote, via: via, hostname: hello.Hostname, version: hello.Version,
-		since: time.Now(), printers: printers, sess: sess, inv: hello.Inventory, invAt: time.Now()}
+		since: time.Now(), printers: printers, sess: sess, inv: hello.Inventory, invAt: time.Now(), seenAs: ip.String()}
 
 	s.mu.Lock()
 	if old := s.online[ac.ID]; old != nil {
@@ -640,6 +680,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 	}
 	s.noteEvents(ac.ID, hello.Inventory)
 	s.wake(ac.ID) // deliver whatever waited for this point
+	go s.measureRTT(conn)
 
 	// Streams the point opens: inventory pushes.
 	go func() {
@@ -960,6 +1001,10 @@ type AgentView struct {
 	Inventory   *proto.Inventory `json:"inventory,omitempty"`
 	InventoryAt time.Time        `json:"inventory_at"`
 	Events      []proto.Event    `json:"events"`
+	// SeenAs: the point's public address; RTT: round trips over its
+	// connection in the last hour (0.17.0).
+	SeenAs string      `json:"seen_as,omitempty"`
+	RTT    []RTTSample `json:"rtt"`
 }
 
 type StateView struct {
@@ -981,6 +1026,10 @@ type StateView struct {
 	Audit       []AuditEntry  `json:"audit"`
 	CrowdSec    CrowdSecView  `json:"crowdsec"`
 	LogLang     string        `json:"log_lang"`
+	// Emergency: an emergency password is set; EmergencyLAN: it is accepted
+	// from the network.
+	Emergency    bool `json:"emergency"`
+	EmergencyLAN bool `json:"emergency_lan"`
 }
 
 // queues asks Windows which queues use our ports. PowerShell is slow, so the
@@ -1010,7 +1059,8 @@ func (s *Server) State() StateView {
 		Fingerprint: tlsutil.Fingerprint(s.cert), Log: s.Log.Lines(), JobTTL: int(s.ttl() / time.Minute), Ports: ports,
 		Allowed: s.cfg.Allowed, Refused: s.refusedViewsLocked(), OnlineFrom: onlineFrom,
 		Security: s.securityLocked(), Bans: s.bansLocked(time.Now()), Alerts: append([]*Alert(nil), s.cfg.Alerts...),
-		Audit: s.audit.recent(100), CrowdSec: cs, LogLang: s.cfg.Lang}
+		Audit: s.audit.recent(100), CrowdSec: cs, LogLang: s.cfg.Lang,
+		Emergency: s.cfg.PasswordHash != "", EmergencyLAN: s.cfg.EmergencyLAN}
 	if qerr != nil {
 		v.QueueError = qerr.Error()
 	}
@@ -1023,6 +1073,8 @@ func (s *Server) State() StateView {
 		if conn != nil {
 			av.Online, av.Remote, av.Hostname, av.Version, av.Since = true, conn.remote, conn.hostname, conn.version, conn.since
 			av.Via = conn.via
+			av.SeenAs = conn.seenAs
+			av.RTT = append([]RTTSample(nil), conn.rtt...)
 			av.Inventory, av.InventoryAt = conn.inv, conn.invAt
 			for _, p := range conn.printers {
 				offered[p.Alias] = p.Name
@@ -1113,4 +1165,19 @@ func (s *Server) SetLang(lang string) error {
 	s.mu.Unlock()
 	s.lang.Store(lang)
 	return err
+}
+
+// SetEmergencyLAN allows or forbids the emergency password from other
+// computers.
+func (s *Server) SetEmergencyLAN(on bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.EmergencyLAN = on
+	return s.save()
+}
+
+func (s *Server) emergencyLAN() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cfg.EmergencyLAN
 }

@@ -157,7 +157,7 @@ func (s *Server) FreePort(agentID, alias string) error {
 var allowedCmds = map[string]bool{
 	"set_shared": true, "add_net_printer": true, "add_port_printer": true,
 	"rename_printer": true, "test_port": true, "drivers": true,
-	"set_driver": true, "set_printer_ip": true,
+	"set_driver": true, "set_printer_ip": true, "traceroute": true,
 }
 
 // Command runs a command on a connected point and returns its data.
@@ -188,7 +188,7 @@ func (s *Server) Command(agentID, cmd string, args json.RawMessage) (json.RawMes
 	if !res.OK {
 		return nil, errors.New(res.Error)
 	}
-	if cmd != "drivers" {
+	if cmd != "drivers" && cmd != "traceroute" {
 		s.Log.Printf("точка «%s»: виконано «%s»", name, cmd)
 	}
 	return res.Data, nil

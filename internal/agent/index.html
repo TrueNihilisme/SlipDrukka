@@ -68,6 +68,9 @@ button:hover{filter:brightness(1.08)}
 /* Sections (0.15.0): each has its own address, so Back/Forward and F5 work. */
 .tabs{max-width:940px;margin:10px auto 0;padding:0 20px;display:flex;gap:6px;flex-wrap:wrap}
 .tabs a{padding:7px 14px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink2);text-decoration:none;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+.kv{display:grid;grid-template-columns:minmax(140px,240px) 1fr;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}.kv>span:first-child{color:var(--mute)}
+.naddr{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;word-break:break-all}
+table.hops td{padding:6px 10px}
 .tabs a:hover{background:rgba(255,255,255,.09)}
 .tabs a.on{color:var(--acc);border-color:rgba(64,224,255,.55);background:rgba(64,224,255,.08)}
 @media (max-width:600px){.status{flex-direction:column;align-items:flex-start;gap:14px;padding:20px}.status h1{font-size:26px}.events li{grid-template-columns:1fr;gap:0}}
@@ -75,7 +78,7 @@ button:hover{filter:brightness(1.08)}
 </head>
 <body>
 <div class="top"><span class="tile"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#40E0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8V4h10v4"/><rect x="4" y="8" width="16" height="8" rx="2"/><path d="M7 14v6h10v-6"/><circle cx="17" cy="11" r="1" fill="#40E0FF"/></svg></span><b>SlipDrukka</b><span id="ver"></span><span class="lang"><button data-lang="uk" onclick="prSetLang('uk')">UA</button><button data-lang="en" onclick="prSetLang('en')">EN</button></span><a class="help" href="https://github.com/TrueNihilisme/SlipDrukka/blob/main/docs/uk/point.md" target="_blank" rel="noopener" title="Як це працює">?</a></div>
-<nav class="tabs" aria-label="Розділи"><a href="#" data-v="status">Стан</a><a href="#events" data-v="events">Події</a><a href="#log" data-v="log">Технічний журнал</a></nav>
+<nav class="tabs" aria-label="Розділи"><a href="#" data-v="status">Стан</a><a href="#events" data-v="events">Події</a><a href="#net" data-v="net">Мережа</a><a href="#log" data-v="log">Технічний журнал</a></nav>
 <main>
   <section class="status" id="hero" data-view="status">
     <svg class="ring" viewBox="0 0 96 96" aria-hidden="true"><circle class="track" cx="48" cy="48" r="42" fill="none" stroke-width="6"/>
@@ -98,18 +101,42 @@ button:hover{filter:brightness(1.08)}
     <p class="lead mute" style="margin-top:12px">Ця сторінка лише показує стан. Принтери додає й налаштовує адміністратор зі свого сервера.</p>
   </section>
 
+  <section class="panel" data-view="net">
+    <h2>Мережа</h2>
+    <div id="netBox" class="mute">…</div>
+    <h2 style="margin-top:18px">Трасування до сервера</h2>
+    <p class="lead mute">Через які вузли йдуть дані до сервера. Займає до хвилини.</p>
+    <div class="row"><button id="trBtn" onclick="runTrace()">Трасувати</button></div>
+    <div id="trOut"></div>
+  </section>
   <section class="panel" id="evCard" data-view="events"><h2>Що відбувалося</h2><ul class="events" id="events"></ul></section>
   <section class="panel" data-view="log"><details id="logBox" open><summary>Технічний журнал</summary><div id="log"></div></details></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 // Sections: #events, #log, or none = status. A link click is a normal history step.
-function route(){const v=['events','log'].includes(location.hash.slice(1))?location.hash.slice(1):'status';
+function route(){const v=['events','log','net'].includes(location.hash.slice(1))?location.hash.slice(1):'status';
   document.querySelectorAll('[data-view]').forEach(e=>e.style.display=e.dataset.view===v?'':'none');
   document.querySelectorAll('.tabs a').forEach(a=>a.classList.toggle('on',a.dataset.v===v));
+  if(v==='net')loadNet();
   if(v==='status'&&location.hash==='#')history.replaceState(null,'',location.pathname+location.search)}
 addEventListener('hashchange',route);addEventListener('popstate',route);route();
 document.querySelector('.tabs a[data-v="status"]').onclick=e=>{e.preventDefault();if(location.hash){history.pushState(null,'',location.pathname+location.search);route()}};
+
+// Network tab (0.17.0).
+const fmtMS=v=>{const u=(window.PR_LANG==='en')?' ms':' мс';return v<0?'—':(v<1?'<1'+u:Math.round(v)+u)};
+async function loadNet(){let n={},st={};try{[n,st]=await Promise.all([fetch('/api/net').then(r=>r.json()),fetch('/api/state').then(r=>r.json()).then(x=>x.status)])}catch(e){return}
+  const ifs=(n.ifaces||[]).map(i=>`<div><span class="mute">${esc(i.name)}:</span> <span class="naddr">${(i.addrs||[]).map(esc).join(', ')}</span></div>`).join('')||'—';
+  $('netBox').classList.remove('mute');
+  $('netBox').innerHTML=`<div class="kv"><span>Зовнішня адреса (як бачить сервер)</span><span class="naddr">${st.seen_as?esc(st.seen_as):'—'}</span></div>
+  <div class="kv"><span>Адреси цього комп'ютера</span><div>${ifs}</div></div>
+  <div class="kv"><span>Роутер</span><span class="naddr">${(n.gateways||[]).length?n.gateways.map(esc).join(', '):'—'}</span></div>
+  <div class="kv"><span>Сервер</span><span class="naddr">${esc(n.server_addr||st.server||'—')}${n.server_ip?' → '+esc(n.server_ip):''}</span></div>
+  <div class="kv"><span>Відгук сервера</span><span>${st.rtt_ms?fmtMS(st.rtt_ms):'—'}</span></div>`}
+async function runTrace(){const o=$('trOut'),b=$('trBtn');b.disabled=true;o.innerHTML='<p class="lead mute">Трасування йде…</p>';
+  try{const r=await fetch('/api/trace',{method:'POST',headers:{'X-SD':'1','X-Lang':window.PR_LANG||'uk'}});const j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);
+    o.innerHTML=`<p class="lead mute">До ${esc(j.target)}: переходів ${j.hops.length}.</p><table class="hops"><tr><th>#</th><th>Адреса</th><th>Відгук</th></tr>${j.hops.map(h=>`<tr><td>${h.n}</td><td class="naddr">${h.ip?esc(h.ip):'<span class="mute">не відповідає</span>'}</td><td>${(h.ms||[]).map(fmtMS).join(' · ')}</td></tr>`).join('')}</table>`}
+  catch(e){o.innerHTML=`<p class="msg-bad">${esc(e.message)}</p>`}b.disabled=false}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const valid=t=>t&&!String(t).startsWith('0001');
 const pad=n=>String(n).padStart(2,'0');

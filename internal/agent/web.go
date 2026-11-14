@@ -6,8 +6,10 @@ package agent
 // a new point or after the server refused the current code.
 
 import (
+	"context"
 	_ "embed"
 	"net/http"
+	"time"
 
 	"slipdrukka/internal/common"
 	"slipdrukka/internal/i18n"
@@ -82,6 +84,25 @@ func (a *Agent) routes() http.Handler {
 			return
 		}
 		common.JSON(w, map[string]bool{"ok": true})
+	})
+	// Network tab (0.17.0): this computer's addresses and the route to the server.
+	m.HandleFunc("GET /api/net", func(w http.ResponseWriter, r *http.Request) {
+		common.JSON(w, a.netInfo())
+	})
+	m.HandleFunc("POST /api/trace", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-SD") != "1" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
+		defer cancel()
+		data, err := a.traceToServer(ctx)
+		if err != nil {
+			common.JSONError(w, http.StatusBadRequest, i18n.Tr(common.LangOf(w), err.Error()))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
 	})
 	return m
 }

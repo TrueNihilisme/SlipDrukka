@@ -55,6 +55,23 @@ every few seconds.
 **Line under the header:** computer name, address, program version, which
 addresses the code is tied to, and until when an unused code is valid.
 
+### Network
+
+The **Network** button on a shop card shows where the shop is:
+
+* **public address** — the one the shop connected from (as the server sees
+  it), and those it connected from before;
+* **addresses in the shop network** and the **router** — reported by the
+  shop program (behind NAT a shop cannot know its own public address, so the
+  server tells it);
+* the **address the shop connects to** and where it leads;
+* **response time** over the connection in the last hour (measured every
+  30 s) with a graph, so you can see when it lagged;
+* **trace** on a button, both ways: from the server to the shop and from the
+  shop to the server. Takes up to a minute.
+
+None of this asks an outside service. Needs shop program 0.17.0 or newer.
+
 ## The printers table
 
 Each row is the path of one printer: **where programs print → where it

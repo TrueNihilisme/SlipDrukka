@@ -53,6 +53,11 @@ type Status struct {
 	Since     time.Time `json:"since"`
 	Version   string    `json:"version"`
 	Via       string    `json:"via"` // proto.ViaWireGuard or proto.ViaTCP
+	// 0.17.0: this point's public (NAT) address as the server sees it, the
+	// address the server's name led to, and the last round trip to it.
+	SeenAs   string  `json:"seen_as,omitempty"`
+	ServerIP string  `json:"server_ip,omitempty"`
+	RTTms    float64 `json:"rtt_ms,omitempty"`
 }
 
 type Agent struct {
@@ -62,6 +67,9 @@ type Agent struct {
 	spool   winprint.Spooler
 
 	mu            sync.Mutex
+	netMu         sync.Mutex
+	netCache      *proto.NetInfo
+	netAt         time.Time
 	cfg           Config
 	status        Status
 	kick          chan struct{}
@@ -404,9 +412,12 @@ func (a *Agent) session(ctx context.Context, codeText string) error {
 		}
 		a.mu.Unlock()
 	}()
+	serverIP := remoteHost(conn, via, code.Addr)
 	a.setStatus(func(s *Status) {
 		s.Connected, s.Name, s.Error, s.Since, s.Via = true, w.Name, "", time.Now(), via
+		s.SeenAs, s.ServerIP, s.RTTms = w.SeenAs, serverIP, 0
 	})
+	go a.measureRTT(sess)
 	if via == proto.ViaWireGuard {
 		a.Log.Printf("підключено до сервера %s через WireGuard як «%s», видано принтерів: %d", code.Addr, w.Name, len(inv.Shared))
 	} else {

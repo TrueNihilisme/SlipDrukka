@@ -363,6 +363,7 @@ func TestAuditLog(t *testing.T) {
 	CheckLogin = func(user, pw string) error { return nil }
 	h := s.routes()
 	r := httptest.NewRequest("POST", "/api/login", strings.NewReader(`{"user":"admin","password":"x"}`))
+	r.Header.Set("X-SD", "1")
 	r.RemoteAddr = "127.0.0.1:5000"
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)

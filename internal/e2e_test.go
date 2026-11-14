@@ -117,6 +117,24 @@ func TestEndToEnd(t *testing.T) {
 		return ports["chek"] != 0 && ports["etiketka"] != 0
 	})
 
+	// 0) Network view (0.17.0): the shop learns its public address from the
+	// server; the server gets the shop's own addresses and round trips.
+	if st := ag.Status(); st.SeenAs != "127.0.0.1" || st.ServerIP != "127.0.0.1" {
+		t.Fatalf("shop network status: seen_as=%q server_ip=%q", st.SeenAs, st.ServerIP)
+	}
+	waitFor(t, "мережа і відгук точки на сервері", func() bool {
+		for _, a := range srv.State().Agents {
+			if a.ID == id && a.SeenAs == "127.0.0.1" && len(a.RTT) > 0 && a.Inventory != nil && a.Inventory.Net != nil &&
+				a.Inventory.Net.ServerAddr == "127.0.0.1:"+strconv.Itoa(agentPort) {
+				return true
+			}
+		}
+		return false
+	})
+	if _, err := srv.Trace(ctx, id, "server"); err == nil {
+		t.Fatal("trace to a loopback point address must be refused")
+	}
+
 	// 1) Byte-exact transfer, including a job larger than one frame.
 	big := make([]byte, 3*proto.MaxFrame+12345)
 	rand.Read(big)

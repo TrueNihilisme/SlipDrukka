@@ -53,7 +53,7 @@
     <Property Id="ARPPRODUCTICON" Value="SlipDrukka.ico" />
     <!-- Setup wizard (installer/ui.wxs). -->
     <UIRef Id="SD_UI" />
-    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka server: a Windows service that receives print jobs from programs on this computer and passes them to the printers of your shops over the internet. It adds one service (SlipDrukka Server, running without administrator rights), a firewall rule for shops to connect, and an admin panel that opens only on this computer: http://127.0.0.1:7330 (shortcut SlipDrukka panel in Start and on the desktop)." />
+    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka server: a Windows service that passes print jobs from programs on this computer to the printers of your shops over the internet. It adds the service (no administrator rights), a firewall rule for shops (open to any address; Settings in the panel gives a command to narrow it to your shops) and an admin panel for this computer only: http://127.0.0.1:7330 (shortcut SlipDrukka panel)." />
     <!-- A log of every install, change and removal, without command-line switches;
          the finish window shows where it is. -->
     <Property Id="MsiLogging" Value="voicewarmup" />

@@ -1,7 +1,11 @@
 name: CI
 
 # Tests and a full build (programs and MSI packages) on every push and pull
-# request. On a tag v* the packages are attached to the release of that tag.
+# request. On a tag v* a separate job attaches the packages to the release.
+#
+# Supply chain (0.17.0): actions are pinned to full commit SHAs (the tag
+# they were resolved from is in the comment), and only the release job, run
+# for tags only, may write to the repository.
 on:
   push:
     branches: [main]
@@ -15,10 +19,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # attach packages to a release (tags only)
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
       - name: Test
@@ -32,14 +38,26 @@ jobs:
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then export VERSION="${GITHUB_REF_NAME#v}"; fi
           ./build.sh
           ls dist/*.msi   # fail if the packages were skipped
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: slipdrukka-${{ github.sha }}
           path: dist/
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and attach the packages
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: slipdrukka-${{ github.sha }}
+          path: dist
       - name: Attach to the release
-        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           # Only the two installers and their checksums: that is all anyone needs.
           # Versions 0.x are test releases.
