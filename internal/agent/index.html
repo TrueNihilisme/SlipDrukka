@@ -134,7 +134,8 @@ async function refresh(){
   else if(s.has_code)sub.push('Програма сама підключиться, щойно з\'явиться інтернет або запрацює сервер. Чеки тим часом чекають на сервері.'+(st.error?' Причина: '+esc(st.error)+'.':''));
   else sub.push('Вставте код підключення нижче.');
   sub.push(`Надруковано ${s.jobs_ok}${s.jobs_failed?`, помилок ${s.jobs_failed}`:''}.`);
-  $('stSub').innerHTML=sub.join(' ');
+  // One span per sentence: each is translated on its own (EN mode).
+  $('stSub').innerHTML=sub.map(x=>`<span>${x}</span>`).join(' ');
   $('codeCard').classList.toggle('hidden',!s.code_replaceable);
   const sh=s.shared||[];
   $('shared').innerHTML=sh.length?'<table><tr><th>Принтер у Windows</th><th>Назва на сервері</th><th>Що друкує</th></tr>'+sh.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.alias)}</td><td>${p.mode==='xps'?'Документ':'Чек / етикетка'}</td></tr>`).join('')+'</table>':'<p class="lead">Поки жоден принтер не видано.</p>';

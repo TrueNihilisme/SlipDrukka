@@ -124,8 +124,8 @@ const P=[
 [/^(\d+) (?:чек чекає|чеки чекають|чеків чекають)$/,m=>`${m[1]} ${m[1]==1?'receipt':'receipts'} waiting`],
 [/^немає зв'язку, (\d+) (?:чек чекає|чеки чекають|чеків чекають)$/,m=>`offline, ${m[1]} ${m[1]==1?'receipt':'receipts'} waiting`],
 [/^: (.*)$/,m=>': '+tr(m[1])],
-[/^«(.+?)»: (.+)$/,m=>`“${m[1]}”: ${tr(m[2])}`],
 [/^«(.+?)»: створіть для нього принтер на сервері$/,m=>`“${m[1]}”: create a printer on the server for it`],
+[/^«(.+?)»: (.+)$/,m=>`“${m[1]}”: ${tr(m[2])}`],
 [/^на зв'язку з (.+)$/,m=>`connected since ${m[1]}`],[/^на зв'язку$/,()=>'connected'],
 [/^(\d+) надруковано$/,m=>`${m[1]} printed`],
 [/^(\d+) надруковано, (\d+) (?:помилка|помилки|помилок)$/,m=>`${m[1]} printed, ${m[2]} ${m[2]==1?'error':'errors'}`],
@@ -169,11 +169,13 @@ const P=[
 ];
 function tr(s){
   if(LANG!=='en'||!s)return s;
-  if(/[«»]/.test(s))s=s.replace(/«/g,'“').replace(/»/g,'”'); // English quotes
-  if(!/[Ѐ-ӿ]/.test(s))return s;
-  if(X[s]!==undefined)return X[s];
-  for(const [re,f] of P){const m=s.match(re);if(m)return f(m)}
-  return s;
+  // English quotes go in after the lookup: the catalog and the patterns are
+  // written with «», and swapping first made every «»-pattern miss (0.15.0).
+  const q=t=>/[«»]/.test(t)?t.replace(/«/g,'“').replace(/»/g,'”'):t;
+  if(!/[Ѐ-ӿ]/.test(s))return q(s);
+  if(X[s]!==undefined)return q(X[s]);
+  for(const [re,f] of P){const m=s.match(re);if(m)return q(f(m))}
+  return q(s);
 }
 window.T=tr;
 if(LANG!=='en')return;
