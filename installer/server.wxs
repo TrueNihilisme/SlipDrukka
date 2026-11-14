@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SlipDrukka Server. Build: wixl -a x64 -D Version=X.Y.Z -o dist/slipdrukka-server.msi installer/server.wxs
+     UpgradeCode and component GUIDs must never change.
+     The service is registered under LocalSystem. At its first start it adds the firewall rule,
+     sets restart-on-failure, gives its own account print rights and switches itself to that
+     account, NT SERVICE\SlipDrukkaServer (see internal/winsvc/account_windows.go). -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="SlipDrukka Server" Language="1033" Version="$(var.Version)" Manufacturer="SlipDrukka"
+           UpgradeCode="E3B6B3FF-BC69-4BF6-AC95-4F528835406B">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             Description="SlipDrukka Server — printers of remote shops as local ports" />
+    <Media Id="1" Cabinet="server.cab" EmbedCab="yes" />
+    <!-- Our exes carry no version resource. Windows Installer then keeps an existing copy whose
+         modified date is later than its create date ("Nonversioned Files are User Data"), which
+         happened on an upgrade from the exe-based install. "a" = always replace our files. -->
+    <Property Id="REINSTALLMODE" Value="amus" />
+    <!-- Never restart the computer, even if a file is in use: a shop till or a
+         terminal server must not reboot in the middle of work
+         (https://learn.microsoft.com/windows/win32/msi/reboot). -->
+    <Property Id="REBOOT" Value="ReallySuppress" />
+    <MajorUpgrade DowngradeErrorMessage="A newer SlipDrukka Server is already installed." />
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="SlipDrukka">
+          <Component Id="ServerExe" Guid="5C7533D5-BDC1-4C9E-9212-12CCD87727E0" Win64="yes">
+            <File Id="ServerExe" Name="slipdrukka-server.exe" Source="dist/slipdrukka-server.exe" KeyPath="yes" />
+            <ServiceInstall Id="ServerSvc" Name="SlipDrukkaServer" DisplayName="SlipDrukka Server"
+                            Description="Accepts SlipDrukka points and exposes their printers as local ports."
+                            Start="auto" Type="ownProcess" ErrorControl="normal" />
+            <ServiceControl Id="ServerSvcCtl" Name="SlipDrukkaServer" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+    <!-- Setup wizard (installer/ui.wxs). -->
+    <UIRef Id="SD_UI" />
+    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka server: a Windows service that receives print jobs from programs on this computer and passes them to the printers of your shops over the internet. It adds one service (SlipDrukka Server, running without administrator rights), a firewall rule for shops to connect, and an admin panel that opens only on this computer: http://127.0.0.1:7330" />
+    <!-- A log of every install, change and removal, without command-line switches;
+         the finish window shows where it is. -->
+    <Property Id="MsiLogging" Value="voicewarmup" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Next: open the admin panel at http://127.0.0.1:7330 and sign in as a Windows administrator of this computer. Installation log: [MsiLogFileLocation]" />
+    <!-- "Apps" in Windows: who made it and where to read about it. -->
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/TrueNihilisme/SlipDrukka" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/TrueNihilisme/SlipDrukka/blob/main/docs/README.md" />
+    <Property Id="ARPCOMMENTS" Value="Print from programs on this server to printers in shops over the internet." />
+    <!-- On removal: take back firewall rules and printing rights before the files go. -->
+    <CustomAction Id="SDCleanup" FileKey="ServerExe" ExeCommand="cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="SDCleanup" Before="StopServices">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+    <Feature Id="Main" Title="SlipDrukka Server" Level="1">
+      <ComponentRef Id="ServerExe" />
+    </Feature>
+  </Product>
+</Wix>

@@ -1,0 +1,16 @@
+# Stage 1 of 2: take a line of crowdsec.log written by the SlipDrukka server,
+#   2026-11-13T09:53:00+02:00 slipdrukka failed-connection src=192.0.2.77 reason=unknown-code
+# and hand the rest of it to slipdrukka-logs.yaml.
+filter: "evt.Line.Labels.type == 'slipdrukka'"
+onsuccess: next_stage
+name: slipdrukka/slipdrukka-raw
+description: "SlipDrukka server log for CrowdSec: time and message"
+nodes:
+  - grok:
+      pattern: '^%{TIMESTAMP_ISO8601:timestamp} slipdrukka %{GREEDYDATA:message}$'
+      apply_on: Line.Raw
+statics:
+  - parsed: program
+    value: slipdrukka
+  - target: evt.StrTime
+    expression: evt.Parsed.timestamp

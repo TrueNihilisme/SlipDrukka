@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlipDrukka — магазин</title>
+<script src="/ui-i18n.js"></script>
+<style>
+/* Same signature as the server panel: deep navy, glass lit from above, Inter;
+   colour means state (cyan value, green works, amber waits, red broken). */
+@font-face{font-family:Inter;src:url(/inter.woff2) format("woff2");font-weight:100 900;font-display:swap}
+:root{color-scheme:dark;--ink:#eef3fa;--ink2:rgba(238,243,250,.72);--mute:rgba(238,243,250,.5);--acc:#40e0ff;--ok:#5fe3a5;--warn:#f2c46b;--bad:#ff6b6b;
+  --edge:rgba(255,255,255,.08);--sunk:rgba(0,0,0,.22);--row:rgba(0,0,0,.18);
+  --body:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;--mono:Consolas,"SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+html{background:#070c16}
+body{margin:0;min-height:100vh;color:var(--ink);font:14px/1.45 var(--body);-webkit-font-smoothing:antialiased;
+  background:radial-gradient(900px 520px at 88% -12%,rgba(64,200,255,.26),transparent 60%),radial-gradient(760px 620px at -8% 112%,rgba(30,110,255,.28),transparent 60%),
+    linear-gradient(118deg,transparent 38%,rgba(140,200,255,.06) 47%,transparent 55%),linear-gradient(160deg,#10192c 0%,#0b1322 55%,#070c16 100%);background-attachment:fixed}
+.hidden{display:none!important}
+h1,h2{font-weight:800;letter-spacing:-.015em;margin:0}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+.top{max-width:940px;margin:0 auto;padding:20px 20px 4px;display:flex;align-items:center;gap:11px}
+.top b{font-size:17px;font-weight:800}
+.top span{color:var(--mute);font-size:12px}
+.tile{width:36px;height:36px;border-radius:11px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#1c2a44,#0b1424);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -4px 10px rgba(0,0,0,.4),0 6px 14px rgba(0,0,0,.45)}
+.tile svg{filter:drop-shadow(0 0 5px rgba(64,224,255,.55))}
+main{max-width:940px;margin:0 auto;padding:14px 20px 60px}
+.panel,.status{background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035));border:1px solid var(--edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 10px 26px rgba(0,0,0,.32);border-radius:18px;padding:20px 22px;margin-top:16px}
+.status{display:flex;align-items:center;gap:24px;padding:26px 28px}
+.ring{flex:none;width:92px;height:92px}
+.ring circle.track{stroke:rgba(255,255,255,.12)}
+.ring .arc,.ring .mark{stroke:var(--mute)}
+.status.ok .ring{filter:drop-shadow(0 0 14px rgba(95,227,165,.45))}.status.ok .arc,.status.ok .mark{stroke:var(--ok)}.status.ok circle.track{stroke:rgba(95,227,165,.18)}
+.status.bad .ring{filter:drop-shadow(0 0 14px rgba(255,107,107,.4))}.status.bad .arc,.status.bad .mark{stroke:var(--bad)}.status.bad circle.track{stroke:rgba(255,107,107,.18)}
+.status .mark-ok,.status .mark-bad{display:none}.status.ok .mark-ok{display:inline}.status.bad .mark-bad{display:inline}
+.status h1{font-size:32px;line-height:1.1;letter-spacing:-.025em}
+.status h1.ok{color:var(--ok);text-shadow:0 0 22px rgba(95,227,165,.25)}.status h1.bad{color:var(--bad)}
+.status p{margin:8px 0 0;color:var(--ink2);font-size:14.5px}
+.panel h2{font-size:17px;font-weight:700}
+.lead{margin:8px 0 0;color:var(--ink2);font-size:13px}
+.mute{color:var(--mute)}
+table{width:100%;border-collapse:separate;border-spacing:0 6px;margin-top:8px}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);font-weight:600;text-align:left;padding:6px 12px 0}
+td{padding:11px 12px;vertical-align:top;background:var(--row);border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}
+td:first-child{border-left:1px solid rgba(255,255,255,.06);border-radius:12px 0 0 12px}td:last-child{border-right:1px solid rgba(255,255,255,.06);border-radius:0 12px 12px 0}
+.events{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}
+.events li{display:grid;grid-template-columns:92px 1fr;gap:10px;padding:7px 12px;border-radius:10px;background:var(--row);border-left:3px solid rgba(64,224,255,.5)}
+.events li.warn{border-left-color:var(--warn)}.events li.error{border-left-color:var(--bad)}
+.events time{color:var(--mute);font-variant-numeric:tabular-nums;font-size:12.5px;padding-top:1px}
+details>summary{cursor:pointer;color:var(--acc);font-weight:600;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:" ›";display:inline-block;transition:transform .15s}details[open]>summary::after{transform:rotate(90deg)}
+#log{margin:12px 0 0;white-space:pre-wrap;font:12.5px/1.6 var(--mono);color:var(--ink2);max-height:320px;overflow:auto;background:var(--sunk);border-radius:12px;padding:12px 14px}
+textarea{font:13px var(--mono);width:100%;padding:10px 12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:var(--sunk);color:var(--ink);margin-top:12px;box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}
+textarea:focus{outline:none;border-color:rgba(64,224,255,.55);box-shadow:inset 0 1px 3px rgba(0,0,0,.4),0 0 0 3px rgba(64,224,255,.15)}
+button{font:inherit;font-weight:700;font-size:13px;cursor:pointer;color:#04263a;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:9px 18px;
+  background:linear-gradient(180deg,#74ecff,#1fa8f0);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 8px 20px rgba(64,224,255,.28)}
+button:hover{filter:brightness(1.08)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.msg-ok{color:var(--ok)}.msg-bad{color:var(--bad)}
+.lang{margin-left:auto;display:flex;gap:4px}.lang button{padding:4px 10px;font-size:11px;box-shadow:none;background:rgba(255,255,255,.06);color:var(--ink2);border:1px solid rgba(255,255,255,.14)}
+.lang button.on{color:var(--acc);border-color:rgba(64,224,255,.55)}
+.help{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:800;color:var(--acc);text-decoration:none;
+  background:rgba(64,224,255,.08);border:1px solid rgba(64,224,255,.3);margin-left:8px}.help:hover{background:rgba(64,224,255,.18)}
+@media (max-width:600px){.status{flex-direction:column;align-items:flex-start;gap:14px;padding:20px}.status h1{font-size:26px}.events li{grid-template-columns:1fr;gap:0}}
+</style>
+</head>
+<body>
+<div class="top"><span class="tile"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#40E0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8V4h10v4"/><rect x="4" y="8" width="16" height="8" rx="2"/><path d="M7 14v6h10v-6"/><circle cx="17" cy="11" r="1" fill="#40E0FF"/></svg></span><b>SlipDrukka</b><span id="ver"></span><span class="lang"><button data-lang="uk" onclick="prSetLang('uk')">UA</button><button data-lang="en" onclick="prSetLang('en')">EN</button></span><a class="help" href="https://github.com/TrueNihilisme/SlipDrukka/blob/main/docs/uk/point.md" target="_blank" rel="noopener" title="Як це працює">?</a></div>
+<main>
+  <section class="status" id="hero">
+    <svg class="ring" viewBox="0 0 96 96" aria-hidden="true"><circle class="track" cx="48" cy="48" r="42" fill="none" stroke-width="6"/>
+      <circle class="arc" cx="48" cy="48" r="42" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="200 64" transform="rotate(-90 48 48)"/>
+      <path class="mark mark-ok" d="M33 49l10 10 20-22" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path class="mark mark-bad" d="M36 36l24 24M60 36L36 60" fill="none" stroke-width="6" stroke-linecap="round"/></svg>
+    <div><h1 id="stText">…</h1><p id="stSub"></p></div>
+  </section>
+
+  <section class="panel hidden" id="codeCard">
+    <h2>Підключення до сервера</h2>
+    <p class="lead">Вставте код, який видав адміністратор у панелі сервера.</p>
+    <textarea id="code" rows="3" placeholder="SD1-…" aria-label="Код підключення"></textarea>
+    <div class="row"><button onclick="saveCode()">Підключити</button><span id="codeMsg"></span></div>
+  </section>
+
+  <section class="panel">
+    <h2>Принтери, на які друкує сервер</h2>
+    <div id="shared"></div>
+    <p class="lead mute" style="margin-top:12px">Ця сторінка лише показує стан. Принтери додає й налаштовує адміністратор зі свого сервера.</p>
+  </section>
+
+  <section class="panel" id="evCard"><h2>Що відбувалося</h2><ul class="events" id="events"></ul></section>
+  <section class="panel"><details><summary>Технічний журнал</summary><div id="log"></div></details></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const valid=t=>t&&!String(t).startsWith('0001');
+const pad=n=>String(n).padStart(2,'0');
+function when(t){if(!valid(t))return'';const d=new Date(t),n=new Date();const hm=pad(d.getHours())+':'+pad(d.getMinutes());
+  return d.toDateString()===n.toDateString()?hm:pad(d.getDate())+'.'+pad(d.getMonth()+1)+' '+hm}
+const lvl=l=>['info','warn','error'].includes(l)?l:'info';
+async function saveCode(){
+  const r=await fetch('/api/code',{method:'POST',headers:{'Content-Type':'application/json','X-SD':'1','X-Lang':window.PR_LANG||'uk'},body:JSON.stringify({code:$('code').value})});
+  const j=await r.json().catch(()=>({}));
+  $('codeMsg').innerHTML=r.ok?'<span class="msg-ok">Збережено, підключаюсь…</span>':'<span class="msg-bad">'+esc(j.error||r.statusText)+'</span>';
+  if(r.ok){$('code').value='';setTimeout(refresh,1500)}}
+async function refresh(){
+  let s;try{s=await(await fetch('/api/state',{headers:{'X-Lang':window.PR_LANG||'uk'}})).json()}catch(e){return}
+  const st=s.status;$('ver').textContent='версія '+st.version;
+  const h=$('stText');
+  if(st.connected){h.textContent='Друк працює';h.className='ok'}
+  else if(s.has_code){h.textContent='Немає зв\'язку з сервером';h.className='bad'}
+  else{h.textContent='Магазин ще не підключено';h.className=''}
+  $('hero').className='status '+h.className;
+  const sub=[];
+  if(st.connected)sub.push(`Підключено до сервера як «${esc(st.name)}» з ${when(st.since)}${st.via==='wireguard'?' через WireGuard':''}.`);
+  else if(s.has_code)sub.push('Програма сама підключиться, щойно з\'явиться інтернет або запрацює сервер. Чеки тим часом чекають на сервері.'+(st.error?' Причина: '+esc(st.error)+'.':''));
+  else sub.push('Вставте код підключення нижче.');
+  sub.push(`Надруковано ${s.jobs_ok}${s.jobs_failed?`, помилок ${s.jobs_failed}`:''}.`);
+  $('stSub').innerHTML=sub.join(' ');
+  $('codeCard').classList.toggle('hidden',!s.code_replaceable);
+  const sh=s.shared||[];
+  $('shared').innerHTML=sh.length?'<table><tr><th>Принтер у Windows</th><th>Назва на сервері</th><th>Що друкує</th></tr>'+sh.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.alias)}</td><td>${p.mode==='xps'?'Документ':'Чек / етикетка'}</td></tr>`).join('')+'</table>':'<p class="lead">Поки жоден принтер не видано.</p>';
+  const ev=(s.events||[]).slice().reverse();
+  $('evCard').classList.toggle('hidden',!ev.length);
+  $('events').innerHTML=ev.map(e=>`<li class="${lvl(e.level)}"><time>${when(e.time)}</time><span>${esc(e.text)}</span></li>`).join('');
+  $('log').textContent=(s.log||[]).join('\n');
+}
+document.querySelectorAll('.lang button').forEach(b=>b.classList.toggle('on',b.dataset.lang===(window.PR_LANG||'uk')));
+if(window.PR_LANG==='en')document.querySelectorAll('a.help').forEach(a=>a.href=a.href.replace('/docs/uk/','/docs/en/'));
+refresh();setInterval(refresh,4000);
+</script>
+</body>
+</html>

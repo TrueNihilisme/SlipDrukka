@@ -1,0 +1,18 @@
+# 5 failed connections from one address within about 10 minutes.
+type: leaky
+name: slipdrukka/slipdrukka-bf
+description: "Repeated failed connections to the SlipDrukka port for shops (scanning or guessing)"
+filter: "evt.Meta.log_type == 'slipdrukka_failed_connection'"
+groupby: evt.Meta.source_ip
+capacity: 4
+leakspeed: 2m
+blackhole: 5m
+labels:
+  service: slipdrukka
+  confidence: 3
+  spoofable: 0
+  classification:
+    - attack.T1110
+  behavior: "tcp:scan"
+  label: "SlipDrukka scanning or guessing"
+  remediation: true

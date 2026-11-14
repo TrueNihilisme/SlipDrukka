@@ -1,0 +1,20 @@
+# Stage 2 of 2: a failed connection to the SlipDrukka port for shops.
+# reason: bad-handshake (garbage instead of a handshake), unknown-code,
+# expired-code. The server never writes addresses of known shops here.
+filter: "evt.Parsed.program == 'slipdrukka'"
+onsuccess: next_stage
+name: slipdrukka/slipdrukka-logs
+description: "SlipDrukka: failed connections to the port for shops"
+nodes:
+  - grok:
+      pattern: '^failed-connection src=%{IP:source_ip} reason=%{NOTSPACE:reason}$'
+      apply_on: message
+statics:
+  - meta: log_type
+    value: slipdrukka_failed_connection
+  - meta: service
+    value: slipdrukka
+  - meta: source_ip
+    expression: evt.Parsed.source_ip
+  - meta: reason
+    expression: evt.Parsed.reason

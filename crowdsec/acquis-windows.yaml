@@ -1,0 +1,6 @@
+# SlipDrukka server: failed connections to the port for shops.
+# Add to C:\ProgramData\CrowdSec\config\acquis.yaml (separate documents with ---).
+filenames:
+  - C:\ProgramData\SlipDrukka\server\crowdsec.log
+labels:
+  type: slipdrukka

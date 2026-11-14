@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SlipDrukka Agent (shop PC). Build: wixl -a x64 -D Version=X.Y.Z -o dist/slipdrukka-agent.msi installer/agent.wxs
+     UpgradeCode and component GUIDs must never change: they let a new MSI replace the old one.
+     Silent install with a connection code:  msiexec /i slipdrukka-agent.msi /qn CODE=SD1-...
+     The service is registered under LocalSystem. At its first start it picks the code up from
+     HKLM\Software\SlipDrukka\AgentCode, sets restart-on-failure, gives its own account print rights
+     and switches itself to that account, NT SERVICE\SlipDrukkaAgent (see internal/winsvc/account_windows.go). -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="SlipDrukka Agent" Language="1033" Version="$(var.Version)" Manufacturer="SlipDrukka"
+           UpgradeCode="360C25BE-5237-4168-B118-E54C7928EE99">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             Description="SlipDrukka Agent — shop printers for the SlipDrukka server" />
+    <Media Id="1" Cabinet="agent.cab" EmbedCab="yes" />
+    <!-- Our exes carry no version resource. Windows Installer then keeps an existing copy whose
+         modified date is later than its create date ("Nonversioned Files are User Data"), which
+         happened on an upgrade from the exe-based install. "a" = always replace our files. -->
+    <Property Id="REINSTALLMODE" Value="amus" />
+    <!-- Never restart the computer, even if a file is in use: a shop till or a
+         terminal server must not reboot in the middle of work
+         (https://learn.microsoft.com/windows/win32/msi/reboot). -->
+    <Property Id="REBOOT" Value="ReallySuppress" />
+    <MajorUpgrade DowngradeErrorMessage="A newer SlipDrukka Agent is already installed." />
+    <Property Id="CODE" Secure="yes" />
+    <!-- Keep the connection code out of installer logs. -->
+    <Property Id="MsiHiddenProperties" Value="CODE" />
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="SlipDrukka">
+          <Component Id="AgentExe" Guid="5FBF5831-285A-493D-8A25-17F9A93D48F7" Win64="yes">
+            <File Id="AgentExe" Name="slipdrukka-agent.exe" Source="dist/slipdrukka-agent.exe" KeyPath="yes" />
+            <ServiceInstall Id="AgentSvc" Name="SlipDrukkaAgent" DisplayName="SlipDrukka Agent"
+                            Description="Shares this PC's printers with the SlipDrukka server."
+                            Start="auto" Type="ownProcess" ErrorControl="normal" />
+            <ServiceControl Id="AgentSvcCtl" Name="SlipDrukkaAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+          </Component>
+          <Component Id="TrayExe" Guid="9DE4ADAF-EFFF-4DC4-8C53-6335614BF724" Win64="yes">
+            <File Id="TrayExe" Name="slipdrukka-tray.exe" Source="dist/slipdrukka-tray.exe" KeyPath="yes" />
+            <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="SlipDrukkaTray"
+                           Type="string" Value="&quot;[INSTALLDIR]slipdrukka-tray.exe&quot;" />
+          </Component>
+          <Component Id="CodeReg" Guid="C132DBA8-44CE-4D16-9B2B-7A2F31AB925E" Win64="yes">
+            <Condition>CODE</Condition>
+            <!-- build.sh closes this key to everyone but SYSTEM and Administrators (MsiLockPermissionsEx). -->
+            <RegistryValue Root="HKLM" Key="Software\SlipDrukka\Setup" Name="AgentCode" Type="string" Value="[CODE]" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+    <!-- Setup wizard (installer/ui.wxs). -->
+    <UIRef Id="SD_UI" />
+    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka shop program: a Windows service that connects this computer to your SlipDrukka server and prints what the server sends on the printers here. It adds one service (SlipDrukka Agent, running without administrator rights) and a status icon next to the clock. Nothing is opened to the internet: this computer connects to the server itself." />
+    <Property Id="SD_ASKCODE" Value="1" />
+    <!-- A log of every install, change and removal, without command-line switches;
+         the finish window shows where it is. -->
+    <Property Id="MsiLogging" Value="voicewarmup" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The shop appears in the server panel as soon as the program connects. Status page: the icon next to the clock. Installation log: [MsiLogFileLocation]" />
+    <!-- "Apps" in Windows: who made it and where to read about it. -->
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/TrueNihilisme/SlipDrukka" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/TrueNihilisme/SlipDrukka/blob/main/docs/README.md" />
+    <Property Id="ARPCOMMENTS" Value="Prints on this computer's printers what the SlipDrukka server sends." />
+    <!-- On removal: take back firewall rules and printing rights before the files go. -->
+    <CustomAction Id="SDCleanup" FileKey="AgentExe" ExeCommand="cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="SDCleanup" Before="StopServices">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+    <Feature Id="Main" Title="SlipDrukka Agent" Level="1">
+      <ComponentRef Id="AgentExe" />
+      <ComponentRef Id="TrayExe" />
+      <ComponentRef Id="CodeReg" />
+    </Feature>
+  </Product>
+</Wix>

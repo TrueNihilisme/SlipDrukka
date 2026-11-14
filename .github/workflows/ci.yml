@@ -1,0 +1,48 @@
+name: CI
+
+# Tests and a full build (programs and MSI packages) on every push and pull
+# request. On a tag v* the packages are attached to the release of that tag.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # attach packages to a release (tags only)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: go test ./... -count=1 -timeout 10m
+      - name: Check that the Windows programs compile
+        run: GOOS=windows GOARCH=amd64 go vet ./...
+      - name: Install MSI tools
+        run: sudo apt-get update && sudo apt-get install -y msitools wixl
+      - name: Build
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then export VERSION="${GITHUB_REF_NAME#v}"; fi
+          ./build.sh
+          ls dist/*.msi   # fail if the packages were skipped
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slipdrukka-${{ github.sha }}
+          path: dist/
+      - name: Attach to the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Only the two installers and their checksums: that is all anyone needs.
+          # Versions 0.x are test releases.
+          pre=""; case "$GITHUB_REF_NAME" in v0.*) pre="--prerelease";; esac
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" $pre --title "SlipDrukka ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist/*.msi dist/SHA256SUMS --clobber
