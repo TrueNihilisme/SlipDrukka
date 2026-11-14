@@ -25,6 +25,7 @@ What we found while testing, what was fixed and what is still open.
 | measurement | **Adding a shop made the server forget where the other points were** for up to 25 s: peers were replaced as a whole. | Peers updated one by one. |
 | live test | **Two tunnels with one key** during a reconnect made the server answer the wrong one. | One tunnel per point, kept between connections. |
 | live test | **After one WireGuard failure the point stayed on TLS for 30 min.** | First retry after 1 min, then every 30 min. |
+| first install of 0.14.0 | **Removal of 0.14.0 failed** (error 1603 / 2762): the cleanup step was placed before `InstallInitialize` by the MSI tool although it was asked for "before StopServices". | 0.14.1 pins the step to 1950 (after StopServices, before DeleteServices). Installing 0.14.1 over 0.14.0 fixes an existing install; then it can be removed normally. |
 | uninstall on test machines | **Uninstall left the UDP firewall rule and an empty program folder.** | `cleanup` removes every rule; the installer runs it on removal. |
 | first start | **A code set before the program started tore down the first session** right after it opened. | That reconnect request is dropped at start. |
 

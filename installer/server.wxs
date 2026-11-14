@@ -46,7 +46,10 @@
     <!-- On removal: take back firewall rules and printing rights before the files go. -->
     <CustomAction Id="SDCleanup" FileKey="ServerExe" ExeCommand="cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
     <InstallExecuteSequence>
-      <Custom Action="SDCleanup" Before="StopServices">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+      <!-- An explicit number: wixl placed Before="StopServices" at 1402, before
+           InstallInitialize, and the removal failed (error 2762). 1950 = after
+           StopServices (1900), before DeleteServices (2000). -->
+      <Custom Action="SDCleanup" Sequence="1950">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
     </InstallExecuteSequence>
     <Feature Id="Main" Title="SlipDrukka Server" Level="1">
       <ComponentRef Id="ServerExe" />
