@@ -418,16 +418,34 @@ fetch('/api/hint').then(r=>r.json()).then(h=>{const t=[];
 
 // ---------- views
 let view='shops';
-document.querySelectorAll('nav.views button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+// Routing (0.15.0): every section has its own address (#settings, #journal, #shop-<id>), so
+// the browser's Back/Forward, F5 and bookmarks work. A section click adds a history step;
+// an open window (add a printer, a shop…) is one step too, so Back closes it instead of
+// leaving the panel.
+const VIEWS=['shops','settings','journal'];
+document.querySelectorAll('nav.views button').forEach(b=>b.onclick=()=>go(b.dataset.view));
 function setView(v){view=v;document.querySelectorAll('nav.views button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
-  ['shops','settings','journal'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));
-  history.replaceState(null,'',v==='shops'?location.pathname:'#'+v)}
-if(['#settings','#journal'].includes(location.hash))setView(location.hash.slice(1));
-document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#shop-"]');if(a&&view!=='shops'){setView('shops');setTimeout(()=>location.hash=a.getAttribute('href'),0)}});
+  VIEWS.forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v))}
+function go(v){const h=v==='shops'?location.pathname+location.search:'#'+v;
+  // A window still open: its history step becomes this section (history.back() here would
+  // race with the push below).
+  if(!$('modal').classList.contains('hidden')){hide('modal');if(history.state&&history.state.modal){history.replaceState(null,'',h);setView(v);scrollTo(0,0);return}}
+  if(('#'+v)!==location.hash&&!(v==='shops'&&!location.hash))history.pushState(null,'',h);
+  setView(v);scrollTo(0,0)}
+function route(){const h=location.hash.slice(1);
+  if(VIEWS.includes(h)){setView(h);return}
+  setView('shops');
+  if(h.startsWith('shop-'))setTimeout(()=>{const el=document.getElementById(h);if(el)el.scrollIntoView({block:'start'})},0)}
+route();
+addEventListener('popstate',e=>{if(!$('modal').classList.contains('hidden')&&!(e.state&&e.state.modal)){hide('modal');return}route()});
+document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#shop-"]');if(!a)return;e.preventDefault();
+  history.pushState(null,'',a.getAttribute('href'));route()});
 
 // ---------- modal
-function modal(html){$('modalBody').innerHTML=html;show('modal');const f=$('modalBody').querySelector('input,select,button.primary');if(f)f.focus()}
-function closeModal(){hide('modal')}
+function modal(html){$('modalBody').innerHTML=html;
+  if($('modal').classList.contains('hidden')&&!(history.state&&history.state.modal))history.pushState({modal:1},'',location.href);
+  show('modal');const f=$('modalBody').querySelector('input,select,button.primary');if(f)f.focus()}
+function closeModal(){if($('modal').classList.contains('hidden'))return;hide('modal');if(history.state&&history.state.modal)history.back()}
 $('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('modal').classList.contains('hidden'))closeModal()});
 const modalHead=(t,doc)=>`<div class="modal-head"><h2>${t}</h2>${doc?help(doc):''}<span class="sp"></span><button class="quiet" onclick="closeModal()">Закрити</button></div>`;

@@ -1,3 +1,5 @@
 dist/
 *.tmp
 cmd/*/rsrc_windows_*.syso
+# wixl writes the product icon here while building the MSI
+/Icon/

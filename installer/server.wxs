@@ -31,14 +31,37 @@
           </Component>
         </Directory>
       </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Component Id="StartShortcut" Guid="683FAA1A-4B40-4E84-8CF2-EEF7B39062E1" Win64="yes">
+          <!-- build.sh sets ShowCmd=7 (minimized, wixl has no Show): no console window flashes.
+               "panel" opens http://127.0.0.1:<port>/ in the browser (port from server.json). -->
+          <Shortcut Id="StartShortcut" Name="SlipDrukka panel" Description="SlipDrukka server admin panel"
+                    Target="[INSTALLDIR]slipdrukka-server.exe" Arguments="panel" WorkingDirectory="INSTALLDIR" />
+          <RegistryValue Root="HKLM" Key="Software\SlipDrukka\Shortcuts" Name="ServerStart" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+      <Directory Id="DesktopFolder">
+        <Component Id="DesktopShortcut" Guid="F79FE892-19F9-47B0-B58B-A285BB5D4C3F" Win64="yes">
+          <Shortcut Id="DesktopShortcut" Name="SlipDrukka panel" Description="SlipDrukka server admin panel"
+                    Target="[INSTALLDIR]slipdrukka-server.exe" Arguments="panel" WorkingDirectory="INSTALLDIR" />
+          <RegistryValue Root="HKLM" Key="Software\SlipDrukka\Shortcuts" Name="ServerDesktop" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
     </Directory>
+    <!-- Icon in "Apps" in Windows. -->
+    <Icon Id="SlipDrukka.ico" SourceFile="assets/icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="SlipDrukka.ico" />
     <!-- Setup wizard (installer/ui.wxs). -->
     <UIRef Id="SD_UI" />
-    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka server: a Windows service that receives print jobs from programs on this computer and passes them to the printers of your shops over the internet. It adds one service (SlipDrukka Server, running without administrator rights), a firewall rule for shops to connect, and an admin panel that opens only on this computer: http://127.0.0.1:7330" />
+    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka server: a Windows service that receives print jobs from programs on this computer and passes them to the printers of your shops over the internet. It adds one service (SlipDrukka Server, running without administrator rights), a firewall rule for shops to connect, and an admin panel that opens only on this computer: http://127.0.0.1:7330 (shortcut SlipDrukka panel in Start and on the desktop)." />
     <!-- A log of every install, change and removal, without command-line switches;
          the finish window shows where it is. -->
     <Property Id="MsiLogging" Value="voicewarmup" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Next: open the admin panel at http://127.0.0.1:7330 and sign in as a Windows administrator of this computer. Installation log: [MsiLogFileLocation]" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open the admin panel" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <!-- Run from the Finish button in installer/ui.wxs, as the signed-in user. -->
+    <CustomAction Id="SDOpen" FileKey="ServerExe" ExeCommand="panel" Return="asyncNoWait" />
     <!-- "Apps" in Windows: who made it and where to read about it. -->
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/TrueNihilisme/SlipDrukka" />
     <Property Id="ARPHELPLINK" Value="https://github.com/TrueNihilisme/SlipDrukka/blob/main/docs/README.md" />
@@ -53,6 +76,8 @@
     </InstallExecuteSequence>
     <Feature Id="Main" Title="SlipDrukka Server" Level="1">
       <ComponentRef Id="ServerExe" />
+      <ComponentRef Id="StartShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
     </Feature>
   </Product>
 </Wix>

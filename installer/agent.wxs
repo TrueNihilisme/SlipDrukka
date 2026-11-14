@@ -26,17 +26,20 @@
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLDIR" Name="SlipDrukka">
-          <Component Id="AgentExe" Guid="5FBF5831-285A-493D-8A25-17F9A93D48F7" Win64="yes">
-            <File Id="AgentExe" Name="slipdrukka-agent.exe" Source="dist/slipdrukka-agent.exe" KeyPath="yes" />
+          <!-- 0.15.0: clear names. SlipDrukka-service.exe = the Windows service (no window);
+               SlipDrukka.exe = the icon next to the clock and the shop page. New GUIDs because the
+               key files were renamed (slipdrukka-agent.exe, slipdrukka-tray.exe before). -->
+          <Component Id="AgentExe" Guid="DB41FEAE-391B-45E1-A7E2-715F6788FC27" Win64="yes">
+            <File Id="AgentExe" Name="SlipDrukka-service.exe" Source="dist/SlipDrukka-service.exe" KeyPath="yes" />
             <ServiceInstall Id="AgentSvc" Name="SlipDrukkaAgent" DisplayName="SlipDrukka Agent"
                             Description="Shares this PC's printers with the SlipDrukka server."
                             Start="auto" Type="ownProcess" ErrorControl="normal" />
             <ServiceControl Id="AgentSvcCtl" Name="SlipDrukkaAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
           </Component>
-          <Component Id="TrayExe" Guid="9DE4ADAF-EFFF-4DC4-8C53-6335614BF724" Win64="yes">
-            <File Id="TrayExe" Name="slipdrukka-tray.exe" Source="dist/slipdrukka-tray.exe" KeyPath="yes" />
+          <Component Id="TrayExe" Guid="3898982E-BCA3-47DC-A12E-662E5BF14C36" Win64="yes">
+            <File Id="TrayExe" Name="SlipDrukka.exe" Source="dist/SlipDrukka.exe" KeyPath="yes" />
             <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="SlipDrukkaTray"
-                           Type="string" Value="&quot;[INSTALLDIR]slipdrukka-tray.exe&quot;" />
+                           Type="string" Value="&quot;[INSTALLDIR]SlipDrukka.exe&quot;" />
           </Component>
           <Component Id="CodeReg" Guid="C132DBA8-44CE-4D16-9B2B-7A2F31AB925E" Win64="yes">
             <Condition>CODE</Condition>
@@ -45,15 +48,46 @@
           </Component>
         </Directory>
       </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Component Id="StartShortcut" Guid="C2F77460-3366-4B4A-949E-F662368EF88D" Win64="yes">
+          <Shortcut Id="StartShortcut" Name="SlipDrukka" Description="Shop page and status icon"
+                    Target="[INSTALLDIR]SlipDrukka.exe" Arguments="open" WorkingDirectory="INSTALLDIR" />
+          <RegistryValue Root="HKLM" Key="Software\SlipDrukka\Shortcuts" Name="Start" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+      <Directory Id="DesktopFolder">
+        <Component Id="DesktopShortcut" Guid="ACA1E96D-7EB3-455F-823F-5F4418B7FE6B" Win64="yes">
+          <Shortcut Id="DesktopShortcut" Name="SlipDrukka" Description="Shop page and status icon"
+                    Target="[INSTALLDIR]SlipDrukka.exe" Arguments="open" WorkingDirectory="INSTALLDIR" />
+          <RegistryValue Root="HKLM" Key="Software\SlipDrukka\Shortcuts" Name="Desktop" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+      <Directory Id="SystemFolder" />
     </Directory>
+    <!-- Icon in "Apps" in Windows. -->
+    <Icon Id="SlipDrukka.ico" SourceFile="assets/icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="SlipDrukka.ico" />
     <!-- Setup wizard (installer/ui.wxs). -->
     <UIRef Id="SD_UI" />
-    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka shop program: a Windows service that connects this computer to your SlipDrukka server and prints what the server sends on the printers here. It adds one service (SlipDrukka Agent, running without administrator rights) and a status icon next to the clock. Nothing is opened to the internet: this computer connects to the server itself." />
+    <Property Id="SD_ABOUT" Value="This installs the SlipDrukka shop program: a Windows service that connects this computer to your SlipDrukka server and prints what the server sends on the printers here. It adds one service (SlipDrukka Agent, running without administrator rights) and a status icon next to the clock (SlipDrukka.exe; the service itself is SlipDrukka-service.exe and has no window). Shortcuts in Start and on the desktop open the shop page. Nothing is opened to the internet: this computer connects to the server itself." />
     <Property Id="SD_ASKCODE" Value="1" />
     <!-- A log of every install, change and removal, without command-line switches;
          the finish window shows where it is. -->
     <Property Id="MsiLogging" Value="voicewarmup" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The shop appears in the server panel as soon as the program connects. Status page: the icon next to the clock. Installation log: [MsiLogFileLocation]" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The shop appears in the server panel as soon as the program connects. The SlipDrukka icon next to the clock shows the status; the SlipDrukka shortcut opens the shop page. Installation log: [MsiLogFileLocation]" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open the shop page" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <!-- installer/ui.wxs runs these from the Finish button, as the signed-in user:
+         SDStart puts the icon next to the clock now (not only at the next sign-in),
+         SDOpen does the same and opens the shop page. -->
+    <Property Id="SD_TRAY" Value="1" />
+    <CustomAction Id="SDStart" FileKey="TrayExe" ExeCommand="" Return="asyncNoWait" />
+    <CustomAction Id="SDOpen" FileKey="TrayExe" ExeCommand="open" Return="asyncNoWait" />
+    <!-- The icon from the previous version keeps its exe busy and holds the one-icon-per-session
+         lock, so the new icon would not start. Close it before files are checked; it is started
+         again at the end. Runs as the user who installs, before anything is changed. -->
+    <!-- SDStopTray itself (taskkill from SystemFolder, type 34) is added by build.sh: wixl has no
+         Directory attribute on CustomAction. -->
     <!-- "Apps" in Windows: who made it and where to read about it. -->
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/TrueNihilisme/SlipDrukka" />
     <Property Id="ARPHELPLINK" Value="https://github.com/TrueNihilisme/SlipDrukka/blob/main/docs/README.md" />
@@ -61,6 +95,7 @@
     <!-- On removal: take back firewall rules and printing rights before the files go. -->
     <CustomAction Id="SDCleanup" FileKey="AgentExe" ExeCommand="cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
     <InstallExecuteSequence>
+      <Custom Action="SDStopTray" Sequence="1390">1</Custom>
       <!-- An explicit number: wixl placed Before="StopServices" at 1402, before
            InstallInitialize, and the removal failed (error 2762). 1950 = after
            StopServices (1900), before DeleteServices (2000). -->
@@ -70,6 +105,8 @@
       <ComponentRef Id="AgentExe" />
       <ComponentRef Id="TrayExe" />
       <ComponentRef Id="CodeReg" />
+      <ComponentRef Id="StartShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
     </Feature>
   </Product>
 </Wix>

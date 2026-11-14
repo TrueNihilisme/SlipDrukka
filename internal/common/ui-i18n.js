@@ -108,7 +108,7 @@ const X={
 'Код підключення':'Connection code','Підключити':'Connect','Збережено, підключаюсь…':'Saved, connecting…',
 'Принтери, на які друкує сервер':'Printers the server prints to','Принтер у Windows':'Printer in Windows','Назва на сервері':'Name on the server',
 'Поки жоден принтер не видано.':'No printer shared yet.','Ця сторінка лише показує стан. Принтери додає й налаштовує адміністратор зі свого сервера.':'This page only shows the status. The administrator adds and sets up printers from the server.',
-'Що відбувалося':'What happened','Технічний журнал':'Technical log','Вставте код підключення нижче.':'Paste the connection code below.',
+'Що відбувалося':'What happened','Події':'Events','Розділи':'Sections','Поки нічого не відбувалося.':'Nothing has happened yet.','Технічний журнал':'Technical log','Вставте код підключення нижче.':'Paste the connection code below.',
 "Програма сама підключиться, щойно з'явиться інтернет або запрацює сервер. Чеки тим часом чекають на сервері.":'The program reconnects on its own once the internet or the server is back. Receipts wait on the server meanwhile.',
 // confirm / prompt / alert
 'Нова назва магазину:':'New shop name:','Скасувати цей чек? Він не надрукується.':'Cancel this receipt? It will not print.',

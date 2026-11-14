@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 
@@ -13,6 +14,7 @@ import (
 	"slipdrukka/internal/server"
 	"slipdrukka/internal/winpeer"
 	"slipdrukka/internal/winsvc"
+	"slipdrukka/internal/winsys"
 )
 
 var version = "dev"
@@ -130,6 +132,9 @@ func main() {
 		cleanup()
 		fail(winsvc.Uninstall(svcName))
 		fmt.Println("Службу видалено. Налаштування лишились у", dataDir())
+	case "panel":
+		// The "SlipDrukka panel" shortcut: open the admin panel in the browser.
+		openPanel()
 	case "cleanup":
 		// Run by the installer when the program is removed (the installer
 		// removes the service itself): leave no firewall rules or rights behind.
@@ -225,4 +230,18 @@ func cleanup() {
 	for _, rule := range []string{firewallRule, firewallRule + " WireGuard", panelRule} {
 		winsvc.RemoveFirewallRule(rule)
 	}
+}
+
+// openPanel opens the admin panel at the address from the settings (the
+// panel may have been moved to another port or opened to the network).
+func openPanel() {
+	var cfg struct {
+		Web string `json:"web"`
+	}
+	_ = common.LoadJSON(common.Join(dataDir(), "server.json"), &cfg)
+	port := "7330"
+	if _, p, err := net.SplitHostPort(cfg.Web); err == nil && p != "" {
+		port = p
+	}
+	exec.Command(winsys.Exe("rundll32.exe"), "url.dll,FileProtocolHandler", "http://127.0.0.1:"+port+"/").Start()
 }

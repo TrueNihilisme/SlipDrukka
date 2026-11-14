@@ -5,19 +5,17 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
+	_ "embed"
 	"encoding/json"
-	"image"
-	"image/color"
-	"image/png"
 	"net/http"
+	"os"
 	"os/exec"
 	"time"
 
 	"fyne.io/systray"
 	"golang.org/x/sys/windows"
 
+	"slipdrukka/internal/i18n"
 	"slipdrukka/internal/winsvc"
 	"slipdrukka/internal/winsys"
 )
@@ -33,6 +31,11 @@ func panelURL() string {
 }
 
 func main() {
+	// "open": started from the shortcut or at the end of the installer — show
+	// the shop page, and the icon if it is not there yet.
+	if len(os.Args) > 1 && os.Args[1] == "open" {
+		openPage()
+	}
 	// One icon per user session.
 	name, _ := windows.UTF16PtrFromString(`Local\SlipDrukkaTray`)
 	if _, err := windows.CreateMutex(nil, false, name); err == windows.ERROR_ALREADY_EXISTS {
@@ -41,26 +44,41 @@ func main() {
 	systray.Run(onReady, func() {})
 }
 
+func openPage() {
+	exec.Command(winsys.Exe("rundll32.exe"), "url.dll,FileProtocolHandler", panelURL()).Start()
+}
+
+// The tray speaks the language of Windows.
+var lang = i18n.System()
+
+func tr(s string) string { return i18n.Tr(lang, s) }
+
+// Status icons: the printer of the SlipDrukka icon, coloured by state
+// (assets/tray-*.svg; green — connected, red — no connection, grey — the
+// service does not answer).
 var (
-	iconOK   = makeIcon(color.RGBA{22, 163, 74, 255})
-	iconBad  = makeIcon(color.RGBA{220, 38, 38, 255})
-	iconIdle = makeIcon(color.RGBA{120, 128, 140, 255})
+	//go:embed tray-ok.ico
+	iconOK []byte
+	//go:embed tray-bad.ico
+	iconBad []byte
+	//go:embed tray-idle.ico
+	iconIdle []byte
 )
 
 func onReady() {
 	systray.SetIcon(iconIdle)
 	systray.SetTooltip("SlipDrukka")
-	status := systray.AddMenuItem("Перевіряю…", "")
+	status := systray.AddMenuItem(tr("Перевіряю…"), "")
 	status.Disable()
 	systray.AddSeparator()
-	open := systray.AddMenuItem("Відкрити панель", "")
-	quit := systray.AddMenuItem("Сховати значок", "Друк продовжить працювати")
+	open := systray.AddMenuItem(tr("Відкрити панель"), "")
+	quit := systray.AddMenuItem(tr("Сховати значок"), tr("Друк продовжить працювати"))
 
 	go func() {
 		for {
 			select {
 			case <-open.ClickedCh:
-				exec.Command(winsys.Exe("rundll32.exe"), "url.dll,FileProtocolHandler", panelURL()).Start()
+				openPage()
 			case <-quit.ClickedCh:
 				systray.Quit()
 				return
@@ -75,17 +93,17 @@ func onReady() {
 				Name      string
 				Error     string
 			}
-			text, icon := "Служба SlipDrukka не працює", iconBad
+			text, icon := tr("Служба SlipDrukka не працює"), iconIdle
 			if r, err := client.Get(panelURL() + "api/status"); err == nil {
 				json.NewDecoder(r.Body).Decode(&st)
 				r.Body.Close()
 				switch {
 				case st.Connected:
-					text, icon = "На зв'язку: "+st.Name, iconOK
+					text, icon = tr("На зв'язку: ")+st.Name, iconOK
 				case st.Error != "":
-					text, icon = "Немає зв'язку: "+st.Error, iconBad
+					text, icon = tr("Немає зв'язку: ")+tr(st.Error), iconBad
 				default:
-					text, icon = "Немає зв'язку з сервером", iconBad
+					text, icon = tr("Немає зв'язку з сервером"), iconBad
 				}
 			}
 			if len([]rune(text)) > 120 {
@@ -97,33 +115,4 @@ func onReady() {
 			time.Sleep(5 * time.Second)
 		}
 	}()
-}
-
-// makeIcon draws a filled printer-ish square with a status colour and wraps
-// the PNG into an .ico container, which is what the Windows tray expects.
-func makeIcon(c color.RGBA) []byte {
-	const n = 32
-	img := image.NewRGBA(image.Rect(0, 0, n, n))
-	for y := 0; y < n; y++ {
-		for x := 0; x < n; x++ {
-			inBody := x >= 3 && x <= 28 && y >= 10 && y <= 23
-			inPaperTop := x >= 8 && x <= 23 && y >= 3 && y <= 10
-			inPaperOut := x >= 8 && x <= 23 && y >= 23 && y <= 29
-			switch {
-			case inBody:
-				img.Set(x, y, c)
-			case inPaperTop || inPaperOut:
-				img.Set(x, y, color.RGBA{245, 245, 245, 255})
-			}
-		}
-	}
-	var p bytes.Buffer
-	png.Encode(&p, img)
-	var ico bytes.Buffer
-	binary.Write(&ico, binary.LittleEndian, []uint16{0, 1, 1})
-	ico.Write([]byte{n, n, 0, 0})
-	binary.Write(&ico, binary.LittleEndian, []uint16{1, 32})
-	binary.Write(&ico, binary.LittleEndian, []uint32{uint32(p.Len()), 22})
-	ico.Write(p.Bytes())
-	return ico.Bytes()
 }

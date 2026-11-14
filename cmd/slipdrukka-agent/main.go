@@ -110,7 +110,7 @@ func main() {
 		exe, err := os.Executable()
 		fail(err)
 		fail(winsvc.Install(svcName, svcDisplay, svcDesc, exe))
-		tray := filepath.Join(filepath.Dir(exe), "slipdrukka-tray.exe")
+		tray := filepath.Join(filepath.Dir(exe), "SlipDrukka.exe")
 		if _, err := os.Stat(tray); err == nil {
 			if err := winsvc.SetAutostart(trayName, `"`+tray+`"`); err != nil {
 				fmt.Println("Не вдалося додати значок в автозапуск:", err)

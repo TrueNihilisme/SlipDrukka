@@ -61,6 +61,11 @@
       <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" Condition="1" />
       <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" Condition="1" />
       <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" Condition="1" />
+      <!-- Finish: the shop program starts its icon next to the clock (SDStart), or the icon and
+           the shop page when the box is ticked (SDOpen); the server opens its panel (SDOpen).
+           Each product defines these actions; not after a removal or repair (Installed). -->
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="SDOpen" Order="1" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="SDStart" Order="2" Condition="SD_TRAY AND NOT WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" Condition="1" />
 
       <InstallUISequence>

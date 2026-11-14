@@ -122,7 +122,7 @@ msiexec /i slipdrukka-agent-X.Y.Z.msi /qn /norestart CODE=SD1-…
 * Нова версія ставиться поверх старої, налаштування зберігаються. Щоб при
   видаленні прибрати ще й правила брандмауера та права служби на принтери,
   спершу виконайте `slipdrukka-server.exe uninstall` (на точці —
-  `slipdrukka-agent.exe uninstall`).
+  `SlipDrukka-service.exe uninstall`).
 
 Кожне вікно з прикладом пояснює [вікі](docs/README.md).
 
@@ -226,7 +226,7 @@ msiexec /i slipdrukka-agent-X.Y.Z.msi /qn /norestart CODE=SD1-…
 
 Повернути службу під SYSTEM (якщо на якомусь комп'ютері власного запису
 виявилось замало): `slipdrukka-server.exe account system`, назад —
-`account limited`. Те саме для `slipdrukka-agent.exe`. У режимі `system`
+`account limited`. Те саме для `SlipDrukka-service.exe`. У режимі `system`
 сервер, як у старих версіях, сам переписує правило брандмауера на порт точок
 зі списком дозволених адрес.
 
