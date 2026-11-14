@@ -59,6 +59,8 @@ that with one small service on the server and one at each shop.
 
 ## Security
 
+What is open, what protects it, what does not, and how to report a vulnerability: [SECURITY.md](SECURITY.md).
+
 * **Encryption:** TLS; the shop checks the server certificate against the
   fingerprint in its connection code. Each shop has its own key; the server
   stores only a hash of it. A new code or deleting a shop revokes it at once.
