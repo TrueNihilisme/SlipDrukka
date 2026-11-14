@@ -286,6 +286,7 @@ ol.steps li::marker{font-weight:800;color:var(--acc)}
 
   <main>
     <section id="view-shops">
+      <div class="note bad hidden" id="syswarn" style="margin:0 0 12px;font-weight:600"></div>
       <div class="status" id="status"></div>
       <div id="shops"></div>
     </section>
@@ -538,6 +539,7 @@ async function refresh(){
   $('bansBox').innerHTML=bans.length?`<h3 style="font-size:15px;margin-top:16px">Заблоковані адреси (${bans.length})</h3><div class="plain-wrap"><table class="plain"><tr><th>Адреса і причина</th><th>Блок</th><th></th></tr>${bans.map(b=>`<tr><td><span class="addr">${esc(b.ip)}</span><br><small class="ink2">${esc(b.reason)}${b.hits?`; відкинуто ще ${b.hits}`:''}</small></td><td style="white-space:nowrap">${b.forever?'назавжди':'до '+when(b.until)}<br><small class="ink2">з ${when(b.since)}</small></td><td style="text-align:right"><button data-unban="${esc(b.ip)}">Розблокувати</button></td></tr>`).join('')}</table></div>`:'<p class="small ink2" style="margin-top:14px">Заблокованих адрес немає.</p>';
   const au=s.audit||[];
   $('auditBox').innerHTML=au.length?`<div class="plain-wrap"><table class="plain"><tr><th>Коли</th><th>Хто</th><th>Звідки</th><th>Що</th></tr>${au.map(e=>`<tr><td>${when(e.at)}</td><td>${esc(e.who)}</td><td class="addr">${esc(e.from)}</td><td>${esc(e.action)}${e.detail?`<span class="ink2"> — ${esc(e.detail)}</span>`:''}</td></tr>`).join('')}</table></div>`:'<p class="small ink2">Ще нічого не змінювали.</p>';
+  $('syswarn').textContent=s.warning||'';$('syswarn').classList.toggle('hidden',!s.warning);
   $('log').textContent=(s.log||[]).join('\n')+(s.queue_error?'\n[PowerShell] '+s.queue_error:'');
   renderStatus();renderShops();
 }
@@ -618,6 +620,7 @@ function shopHTML(a,ai){
   const meta=[];
   if(a.online)meta.push(`Комп'ютер ${esc(a.hostname)}, адреса ${esc(host(a.remote))}, програма ${esc(a.version)}.`);
   const rt=(a.rtt||[]);if(a.online&&rt.length)meta.push(`Відгук: ${fmtMS(rt[rt.length-1].ms)}.`);
+  if(a.own_key)meta.push('Код підключення вже використано: у магазину власний ключ.');
   if((a.allowed_ips||[]).length)meta.push(`Код діє лише з ${a.allowed_ips.map(esc).join(', ')}.`);
   if(a.code_expired)meta.push(`Код підключення протермінований: ним так і не скористались. Видайте новий (Ще → Видати новий код підключення).`);
   else if(valid(a.code_expires))meta.push(`Код підключення ще не використано, він діє до ${esc(when(a.code_expires))}.`);

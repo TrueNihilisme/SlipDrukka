@@ -54,7 +54,7 @@ func CurrentAccount() string                   { return "" }
 func KeepSystem(string) bool                   { return false }
 func SetKeepSystem(string, bool) error         { return errNotWindows }
 func SetServiceAccount(string, bool) error     { return errNotWindows }
-func LowerPrivileges(Limits)                   {}
+func LowerPrivileges(Limits) (bool, string)    { return false, "" }
 func RequirePrivileged() error                 { return errNotWindows }
 func GrantPrintAdmin(string) ([]string, error) { return nil, errNotWindows }
 func RevokePrintAdmin(string) error            { return errNotWindows }

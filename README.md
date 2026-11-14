@@ -62,8 +62,9 @@ that with one small service on the server and one at each shop.
 What is open, what protects it, what does not, and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 
 * **Encryption:** TLS; the shop checks the server certificate against the
-  fingerprint in its connection code. Each shop has its own key; the server
-  stores only a hash of it. A new code or deleting a shop revokes it at once.
+  fingerprint in its connection code. The code works once: at the first
+  connection the shop gets its own key, and the server stores only a hash of
+  it. A new code or deleting a shop revokes it at once.
 * **WireGuard (optional, on by default):** built into both programs as a
   userspace stack — no adapter, no driver, no routes in Windows, other VPNs
   are not touched. The TLS connection runs inside the tunnel, and the server
@@ -115,6 +116,22 @@ msiexec /i slipdrukka-agent-X.Y.Z.msi /qn /norestart CODE=SD1-…
 The packages never restart the computer. The [wiki](docs/README.md) explains
 every window with an example.
 
+### Check a download
+
+From 0.18.0 every installer in a release has a Sigstore signature next to it
+(`….msi.sigstore.json`). It proves the file was built by this repository's
+release workflow from the tag. With [cosign](https://docs.sigstore.dev/)
+installed:
+
+```
+cosign verify-blob slipdrukka-server-X.Y.Z.msi \
+  --bundle slipdrukka-server-X.Y.Z.msi.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/TrueNihilisme/SlipDrukka/\.github/workflows/ci\.yml@refs/tags/v'
+```
+
+This is not a Windows signature: Windows still shows "Unknown publisher".
+
 ## Requirements
 
 * Server: Windows Server (measured on 2019) or Windows 10/11.
@@ -160,7 +177,7 @@ Settings, logs and keys: `%ProgramData%\SlipDrukka\server` or `…\agent`
 go test ./...       # end-to-end tests: server ↔ shop on a fake spooler
 ```
 
-Needs Go 1.27.3 or newer (the version in `go.mod`); the MSI packages need
+Needs Go 1.27.4 or newer (the version in `go.mod`); the MSI packages need
 `msitools` (`brew install msitools`). Every push is tested and built by
 [GitHub Actions](.github/workflows/ci.yml); the packages of a release are
 built there from its tag.

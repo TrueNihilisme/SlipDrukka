@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -206,7 +207,9 @@ func (r *rig) view() server.AgentView {
 
 func (r *rig) waitOnline() {
 	r.t.Helper()
-	waitLong(r.t, "точка на зв'язку", func() bool { return r.view().Online && r.ag.Status().Connected })
+	// OwnKey: after its first connection the point reconnects once with its
+	// own key; the test goes on with that session.
+	waitLong(r.t, "точка на зв'язку", func() bool { v := r.view(); return v.Online && v.OwnKey && r.ag.Status().Connected })
 }
 
 func (r *rig) printed() [][]byte { return r.spool.Jobs(rigPrinter) }
@@ -461,7 +464,18 @@ func TestResilienceStuckArrivalReleases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer a.Close()
+	// The stuck connection is reset, not closed: a plain close would turn
+	// "stuck" into a finished job, and the server would be writing it into the
+	// spool while the test folder is being removed. The test waits until the
+	// server has dropped the job's files.
+	defer func() {
+		a.(*net.TCPConn).SetLinger(0)
+		a.Close()
+		waitFor(t, "черга сервера порожня після скидання завислого з'єднання", func() bool {
+			left, err := os.ReadDir(r.sdir + "/spool")
+			return err != nil || len(left) == 0
+		})
+	}()
 	a.Write([]byte("stuck"))
 	time.Sleep(200 * time.Millisecond)
 	start := time.Now()

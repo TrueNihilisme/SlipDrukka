@@ -34,8 +34,10 @@ A shop opens nothing to the internet: it connects to the server itself.
 * **Encryption both ways.** Shops talk to the server over TLS 1.2+ or over
   WireGuard built into the program. The connection code carries the
   server's key fingerprint, so a shop cannot be pointed at a fake server.
-* **One code per shop.** Without a valid code nothing gets past the
-  handshake. Unused codes expire (default 7 days). A shop's code can be
+* **One code per shop, and it works once.** Without a valid code or key
+  nothing gets past the handshake. At its first connection the shop program
+  gets its own long-term key; once it has connected with that key, the code
+  is refused for good. Unused codes expire (default 7 days). A shop can be
   limited to its own addresses.
 * **Ban after guessing.** 5 failed connections in 10 minutes block the
   address (default 5 days). Allowed addresses and addresses of shops seen
@@ -45,7 +47,11 @@ A shop opens nothing to the internet: it connects to the server itself.
   Every change made in the panel is written to audit.log.
 * **No administrator rights.** Both services run under their own Windows
   accounts (`NT SERVICE\SlipDrukkaServer`, `NT SERVICE\SlipDrukkaAgent`),
-  not as SYSTEM. A broken service cannot take over Windows.
+  not as SYSTEM. A broken service cannot take over Windows. The installer
+  registers a service as SYSTEM; at its start the service first switches to
+  its own account and restarts, and only then opens its ports and connects.
+  If the switch fails, the service keeps printing as SYSTEM and its page
+  shows a warning until this is fixed.
 * **Panel sign-in.** Only an administrator of the server's Windows can sign
   in to the admin panel, and only on the server itself. The optional
   emergency password is accepted from other computers only when Settings
@@ -54,7 +60,7 @@ A shop opens nothing to the internet: it connects to the server itself.
   cannot replace a working connection code.
 * **Releases** are built by GitHub Actions from the tag, with actions pinned
   to commit SHAs; only the release step, run for tags, may write to the
-  repository.
+  repository. From 0.18.0 it signs the installers with Sigstore.
 * **Optional:** CrowdSec rules (folder `crowdsec/`), and a firewall command
   in the panel (Settings) that narrows the program's rule to the shops port
   and the shops' addresses.
@@ -67,13 +73,20 @@ A shop opens nothing to the internet: it connects to the server itself.
   from Settings. Giving the service the rights to do this itself was
   measured to work and rejected: it would let a broken service change the
   server's network settings.
-* **Installers are not signed.** Windows shows "Unknown publisher". Check
-  the file against `SHA256SUMS` from the release.
-* **The connection code is the shop's key.** Whoever holds it can connect
-  as that shop (limit it to the shop's addresses to narrow this). Codes end
-  up in chats, on USB sticks and in verbose installer logs: if one may have
-  leaked, issue a new one in the panel (More → Issue a new connection code); the old one
-  stops working at once.
+* **Installers have no Windows signature.** Windows shows "Unknown
+  publisher". Check the file against `SHA256SUMS` from the release, or
+  verify its Sigstore signature, which proves it was built by this
+  repository's release workflow (README, "Check a download").
+* **An unused connection code is the shop's key.** Until the shop program
+  has connected, whoever holds the code can connect as that shop (limit the
+  shop to its addresses to narrow this). After the first connection the code
+  is useless; the shop's own key stays in its data folder, readable only by
+  the service and administrators of that computer. Between issuing the key
+  and the shop's first connection with it the server keeps that key, not
+  only its hash. A shop program older than 0.18.0 keeps using the code. If
+  a code or a shop computer may have been compromised, issue a new code in
+  the panel (More → Issue a new connection code); the old key stops working
+  at once.
 * **The admin panel has no HTTPS.** On the server itself this does not
   matter; from the network, the emergency password travels in clear text,
   which is why that is off by default.
@@ -86,5 +99,3 @@ A shop opens nothing to the internet: it connects to the server itself.
 ## Planned
 
 * HTTPS for the admin panel when it is open to the network.
-* One-time connection codes: after the first connection the shop gets a
-  new long-term key, and the code itself stops working.

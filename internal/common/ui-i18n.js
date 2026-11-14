@@ -126,6 +126,7 @@ const X={
 'Трасувати':'Trace',"Адреси цього комп'ютера":'Addresses of this computer','Відгук сервера':'Server response time',
 "Аварійний пароль з інших комп'ютерів":'Emergency password from other computers','заборонено':'not allowed','дозволено':'allowed',
 "Панель працює без HTTPS: з іншого комп'ютера пароль іде мережею відкритим текстом, і його може перехопити будь-хто в цій мережі. Дозволяйте лише в довіреній мережі.":'The panel has no HTTPS: from another computer the password travels in clear text and anyone on that network can catch it. Allow it only on a trusted network.',
+'Код підключення вже використано: у магазину власний ключ.':'The connection code has been used: the shop has its own key.',
 'Що відбувалося':'What happened','Події':'Events','Розділи':'Sections','Поки нічого не відбувалося.':'Nothing has happened yet.','Технічний журнал':'Technical log','Вставте код підключення нижче.':'Paste the connection code below.',
 "Програма сама підключиться, щойно з'явиться інтернет або запрацює сервер. Чеки тим часом чекають на сервері.":'The program reconnects on its own once the internet or the server is back. Receipts wait on the server meanwhile.',
 // confirm / prompt / alert

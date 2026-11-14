@@ -93,6 +93,9 @@ func (s *Server) updatePeersLocked() error {
 		if k, err := wgtun.ParseKey(a.WGPub); err == nil {
 			keys = append(keys, k)
 		}
+		if k, err := wgtun.ParseKey(pendingWGPub(a)); err == nil {
+			keys = append(keys, k) // one-time codes: the key it is about to use
+		}
 	}
 	now := time.Now()
 	for pub, until := range s.wgGrace {

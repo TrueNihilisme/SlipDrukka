@@ -86,8 +86,15 @@ func main() {
 					a.Log.Printf("код підключення отримано від установника")
 				}
 			}
-			go winsvc.LowerPrivileges(winsvc.Limits{Service: svcName, DataDir: dataDir(), Prepare: prepare, Log: a.Log.Printf})
-			return a.Run(ctx)
+			// Rights are lowered before the service starts its work: while
+			// the process is LocalSystem, nothing listens and nothing
+			// connects to the server.
+			lower := func() bool {
+				restarting, problem := winsvc.LowerPrivileges(winsvc.Limits{Service: svcName, DataDir: dataDir(), Prepare: prepare, Log: a.Log.Printf})
+				a.SetWarning(problem)
+				return restarting
+			}
+			return winsvc.Start(ctx, lower, a.Run, a.Log.Printf)
 		})
 		if err != nil {
 			os.Exit(1)

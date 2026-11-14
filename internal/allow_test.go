@@ -78,7 +78,7 @@ func TestAllowList(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "точку відключено", func() bool { return !online() })
-	ag.SetCode(code) // reconnect right away
+	reconnect(t, ag, adir) // reconnect right away
 	waitFor(t, "адреса у відхилених", func() bool {
 		for _, r := range srv.State().Refused {
 			if r.IP == "127.0.0.1" {
@@ -98,7 +98,7 @@ func TestAllowList(t *testing.T) {
 	if err := srv.SetAllowed("10.9.9.9\n127.0.0.1", false); err != nil {
 		t.Fatal(err)
 	}
-	ag.SetCode(code)
+	reconnect(t, ag, adir)
 	waitFor(t, "точка повернулась", online)
 
 	// 4) Tie the point's code to another address: refused after hello.
@@ -112,11 +112,11 @@ func TestAllowList(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "прив'язана точка відключена", func() bool { return !online() })
-	ag.SetCode(code)
+	reconnect(t, ag, adir)
 	waitFor(t, "агент бачить відмову", func() bool { return strings.Contains(ag.Status().Error, "не дозволено") })
 	if err := srv.SetAgentAllowed(id, ""); err != nil {
 		t.Fatal(err)
 	}
-	ag.SetCode(code)
+	reconnect(t, ag, adir)
 	waitFor(t, "точка знову на зв'язку", online)
 }

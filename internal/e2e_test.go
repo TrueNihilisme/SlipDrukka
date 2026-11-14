@@ -6,7 +6,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"net"
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +35,17 @@ func freePort(t *testing.T) int {
 	}
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port
+}
+
+// reconnect makes a point connect again with what it has now: after its
+// first connection that is its own key, not the one-time code (0.18.0).
+func reconnect(t *testing.T, ag *agent.Agent, adir string) {
+	t.Helper()
+	var cfg struct{ Code string }
+	if err := common.LoadJSON(adir+"/agent.json", &cfg); err != nil || cfg.Code == "" {
+		t.Fatalf("point config: %v", err)
+	}
+	ag.SetCode(cfg.Code)
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {
@@ -116,6 +129,22 @@ func TestEndToEnd(t *testing.T) {
 		}
 		return ports["chek"] != 0 && ports["etiketka"] != 0
 	})
+
+	// 00) One-time code (0.18.0): the point swapped its code for its own key.
+	waitFor(t, "власний ключ точки", func() bool {
+		for _, a := range srv.State().Agents {
+			if a.ID == id && a.Online && a.OwnKey {
+				return true
+			}
+		}
+		return false
+	})
+	waitFor(t, "агент знову на зв'язку з власним ключем", func() bool { return ag.Status().Connected })
+	if c, err := proto.ParseCode(code); err != nil {
+		t.Fatal(err)
+	} else if b, err := os.ReadFile(adir + "/agent.json"); err != nil || strings.Contains(string(b), c.Key) {
+		t.Fatalf("the point still keeps its connection code (err %v)", err)
+	}
 
 	// 0) Network view (0.17.0): the shop learns its public address from the
 	// server; the server gets the shop's own addresses and round trips.

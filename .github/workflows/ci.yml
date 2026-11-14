@@ -6,6 +6,11 @@ name: CI
 # Supply chain (0.17.0): actions are pinned to full commit SHAs (the tag
 # they were resolved from is in the comment), and only the release job, run
 # for tags only, may write to the repository.
+#
+# Signatures (0.18.0): the release job signs the installers and SHA256SUMS
+# with Sigstore (cosign, keyless: the certificate names this workflow and
+# the tag). This proves where a file was built; it is not a Windows
+# (Authenticode) signature.
 on:
   push:
     branches: [main]
@@ -49,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release and attach the packages
+      id-token: write # Sigstore: a short-lived certificate for this workflow run
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -64,3 +70,14 @@ jobs:
           pre=""; case "$GITHUB_REF_NAME" in v0.*) pre="--prerelease";; esac
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" $pre --title "SlipDrukka ${GITHUB_REF_NAME#v}" --generate-notes
           gh release upload "$GITHUB_REF_NAME" dist/*.msi dist/SHA256SUMS --clobber
+      # After the upload: a signing failure leaves the release usable.
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: Sign with Sigstore
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for f in dist/*.msi dist/SHA256SUMS; do
+            cosign sign-blob --yes --bundle "$f.sigstore.json" "$f"
+          done
+          gh release upload "$GITHUB_REF_NAME" dist/*.sigstore.json --clobber

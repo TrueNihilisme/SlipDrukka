@@ -67,6 +67,7 @@ type Agent struct {
 	spool   winprint.Spooler
 
 	mu            sync.Mutex
+	warning       string // shown in the page (SetWarning)
 	netMu         sync.Mutex
 	netCache      *proto.NetInfo
 	netAt         time.Time
@@ -358,7 +359,7 @@ func (a *Agent) session(ctx context.Context, codeText string) error {
 
 	conn.SetDeadline(time.Now().Add(20 * time.Second))
 	if err := proto.WriteLine(conn, proto.Hello{Proto: proto.Version, Version: a.Version, Key: code.Key, Hostname: host,
-		Printers: inv.Shared, Inventory: inv}); err != nil {
+		Printers: inv.Shared, Inventory: inv, Caps: []string{proto.CapOwnKey}}); err != nil {
 		conn.Close()
 		return err
 	}
@@ -372,6 +373,12 @@ func (a *Agent) session(ctx context.Context, codeText string) error {
 		return &refusedError{w.Error}
 	}
 	conn.SetDeadline(time.Time{})
+	if w.NewKey != "" {
+		// One-time code: the server gave this point its own key. Save it and
+		// come back with it; the code stops working once the server sees it.
+		conn.Close()
+		return a.adoptKey(code, w.NewKey)
+	}
 	a.mu.Lock()
 	if w.Lang != "" && w.Lang != a.cfg.Lang {
 		a.cfg.Lang = w.Lang // the server's choice

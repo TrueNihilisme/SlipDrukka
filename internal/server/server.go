@@ -88,6 +88,12 @@ type AgentConfig struct {
 	CodeIssued time.Time `json:"code_issued,omitempty"`
 	// CodeUsed: a point has connected with the current code.
 	CodeUsed bool `json:"code_used,omitempty"`
+	// One-time codes (0.18.0). OwnKey: the point connects with its own key
+	// from the server, so its connection code no longer works. PendingKey:
+	// that key, issued but not yet confirmed by a connection with it; kept
+	// until then so it can be sent again if the point did not save it.
+	OwnKey     bool   `json:"own_key,omitempty"`
+	PendingKey string `json:"pending_key,omitempty"`
 	// Seen: addresses the point connected from, newest last.
 	Seen []string `json:"seen,omitempty"`
 	// WGPub: the point's WireGuard public key, derived from its code secret
@@ -186,6 +192,7 @@ type Server struct {
 	// attempts are counted per key. nil: the address of the browser.
 	LoginKey  func(r *http.Request) string
 	refusedAt time.Time // last log line about a refused local connection
+	warning   string    // shown in the admin page (SetWarning)
 
 	refused map[string]*refusedInfo // source IP -> refused connections
 	fails   map[string][]time.Time  // source IP -> recent failed connections
@@ -594,10 +601,14 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 	}
 	s.mu.Lock()
 	var ac *AgentConfig
+	usedPending := false // the point came with the key it was just issued
 	h := common.SHA256Hex(hello.Key)
 	for _, a := range s.cfg.Agents {
 		if subtle.ConstantTimeCompare([]byte(a.KeyHash), []byte(h)) == 1 {
 			ac = a
+		}
+		if a.PendingKey != "" && subtle.ConstantTimeCompare([]byte(common.SHA256Hex(a.PendingKey)), []byte(h)) == 1 {
+			ac, usedPending = a, true
 		}
 	}
 	expired := ac != nil && s.codeExpiredLocked(ac, time.Now())
@@ -624,7 +635,11 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 		}
 		return
 	}
-	if peer != nil && ac.WGPub != peer.String() {
+	wantWG := ac.WGPub
+	if usedPending {
+		wantWG = wgtun.PointPublic(hello.Key).String()
+	}
+	if peer != nil && wantWG != peer.String() {
 		refuse("ключ WireGuard не відповідає коду цієї точки")
 		return
 	}
@@ -641,7 +656,11 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 	printers := cleanPrinters(hello.Printers)
 
 	s.mu.Lock()
+	newKey, dirty := s.ownKeyLocked(ac, hello, usedPending)
 	if s.learnWGKeyLocked(ac, hello.Key) {
+		dirty = true
+	}
+	if dirty {
 		if err := s.save(); err != nil {
 			s.Log.Printf("ПОМИЛКА збереження конфігу: %v", err)
 		}
@@ -649,7 +668,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 	wgPub := s.welcomeWGLocked()
 	s.mu.Unlock()
 	via := viaName(peer)
-	if err := proto.WriteLine(c, proto.Welcome{OK: true, Name: ac.Name, WireGuard: wgPub, Via: via, Lang: s.logLang(), SeenAs: ip.String()}); err != nil {
+	if err := proto.WriteLine(c, proto.Welcome{OK: true, Name: ac.Name, WireGuard: wgPub, Via: via, Lang: s.logLang(), SeenAs: ip.String(), NewKey: newKey}); err != nil {
 		c.Close()
 		return
 	}
@@ -896,6 +915,7 @@ func (s *Server) Rekey(id string) (string, error) {
 	}
 	a.KeyHash = common.SHA256Hex(key)
 	a.CodeIssued, a.CodeUsed = time.Now(), false
+	a.OwnKey, a.PendingKey = false, ""
 	s.learnWGKeyLocked(a, key)
 	if c := s.online[id]; c != nil {
 		c.sess.Close()
@@ -1005,6 +1025,8 @@ type AgentView struct {
 	// connection in the last hour (0.17.0).
 	SeenAs string      `json:"seen_as,omitempty"`
 	RTT    []RTTSample `json:"rtt"`
+	// OwnKey: the point has its own key; its connection code no longer works.
+	OwnKey bool `json:"own_key"`
 }
 
 type StateView struct {
@@ -1030,6 +1052,9 @@ type StateView struct {
 	// from the network.
 	Emergency    bool `json:"emergency"`
 	EmergencyLAN bool `json:"emergency_lan"`
+	// Warning is a problem of the service itself, not of a shop (it runs
+	// with LocalSystem rights although it should not).
+	Warning string `json:"warning,omitempty"`
 }
 
 // queues asks Windows which queues use our ports. PowerShell is slow, so the
@@ -1048,6 +1073,14 @@ func (s *Server) queues() (map[string][]Queue, error) {
 	return q, nil
 }
 
+// SetWarning sets (or, with "", clears) the warning shown at the top of the
+// admin page.
+func (s *Server) SetWarning(text string) {
+	s.mu.Lock()
+	s.warning = text
+	s.mu.Unlock()
+}
+
 func (s *Server) State() StateView {
 	cs := s.crowdSecView()
 	queues, qerr := s.queues()
@@ -1060,12 +1093,12 @@ func (s *Server) State() StateView {
 		Allowed: s.cfg.Allowed, Refused: s.refusedViewsLocked(), OnlineFrom: onlineFrom,
 		Security: s.securityLocked(), Bans: s.bansLocked(time.Now()), Alerts: append([]*Alert(nil), s.cfg.Alerts...),
 		Audit: s.audit.recent(100), CrowdSec: cs, LogLang: s.cfg.Lang,
-		Emergency: s.cfg.PasswordHash != "", EmergencyLAN: s.cfg.EmergencyLAN}
+		Emergency: s.cfg.PasswordHash != "", EmergencyLAN: s.cfg.EmergencyLAN, Warning: s.warning}
 	if qerr != nil {
 		v.QueueError = qerr.Error()
 	}
 	for _, a := range s.cfg.Agents {
-		av := AgentView{ID: a.ID, Name: a.Name, AllowedIPs: a.AllowedIPs, Seen: a.Seen, CodeExpires: s.codeExpiresLocked(a), HasWG: a.WGPub != ""}
+		av := AgentView{ID: a.ID, Name: a.Name, AllowedIPs: a.AllowedIPs, Seen: a.Seen, CodeExpires: s.codeExpiresLocked(a), HasWG: a.WGPub != "", OwnKey: a.OwnKey}
 		av.CodeExpired = !av.CodeExpires.IsZero() && time.Now().After(av.CodeExpires)
 		conn := s.online[a.ID]
 		offered := map[string]string{}

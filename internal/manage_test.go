@@ -95,7 +95,9 @@ func TestManageAndWatch(t *testing.T) {
 		}
 		return server.AgentView{}
 	}
-	waitFor(t, "точка на зв'язку з інвентарем", func() bool { a := agentView(); return a.Online && a.Inventory != nil })
+	// OwnKey: the point reconnects once right after its first connection
+	// (it swaps the code for its own key); commands go to the session after.
+	waitFor(t, "точка на зв'язку з інвентарем", func() bool { a := agentView(); return a.Online && a.OwnKey && a.Inventory != nil })
 	if n := len(agentView().Inventory.Printers); n != 2 {
 		t.Fatalf("сервер бачить %d принтерів точки, мало бути 2", n)
 	}

@@ -107,8 +107,14 @@ func main() {
 			if err != nil {
 				return err
 			}
-			go winsvc.LowerPrivileges(winsvc.Limits{Service: svcName, DataDir: dataDir(), Prepare: prepare, Log: s.Log.Printf})
-			return s.Run(ctx)
+			// Rights are lowered before any port is opened: while the
+			// process is LocalSystem, nothing listens on the network.
+			lower := func() bool {
+				restarting, problem := winsvc.LowerPrivileges(winsvc.Limits{Service: svcName, DataDir: dataDir(), Prepare: prepare, Log: s.Log.Printf})
+				s.SetWarning(problem)
+				return restarting
+			}
+			return winsvc.Start(ctx, lower, s.Run, s.Log.Printf)
 		})
 		if err != nil {
 			os.Exit(1)

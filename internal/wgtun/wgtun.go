@@ -116,6 +116,18 @@ func PointAddr(pub Key) netip.Addr {
 
 const mtu = 1380 // leaves room for PPPoE and other overhead on shop lines
 
+// newBind is the UDP socket WireGuard uses. Always Go's ordinary sockets,
+// never the library's Windows default (registered I/O).
+//
+// Measured on Windows (0.18.0): when a shop closed its tunnel, the server's
+// next packet to it came back as "port unreachable", Windows reported that
+// on the server's socket as "connection forcibly closed" (WSAECONNRESET),
+// and the library stopped receiving on that socket for good — no shop could
+// use WireGuard until the service was restarted. Go's own UDP sockets switch
+// that Windows behaviour off (SIO_UDP_CONNRESET in net/fd_windows.go); the
+// library's registered-I/O sockets do not.
+func newBind() conn.Bind { return conn.NewStdNetBind() }
+
 // ---------------------------------------------------------------- server
 
 // Server is the WireGuard side of the server: one UDP port, one peer per
@@ -135,7 +147,7 @@ func Listen(priv Key, port int) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	dev := device.NewDevice(tdev, conn.NewDefaultBind(), device.NewLogger(device.LogLevelSilent, ""))
+	dev := device.NewDevice(tdev, newBind(), device.NewLogger(device.LogLevelSilent, ""))
 	if err := dev.IpcSet(fmt.Sprintf("private_key=%s\nlisten_port=%d\n", priv.hex(), port)); err != nil {
 		dev.Close()
 		return nil, err
@@ -268,7 +280,7 @@ func NewClient(ctx context.Context, priv, serverPub Key, server string) (*Client
 	if err != nil {
 		return nil, err
 	}
-	dev := device.NewDevice(tdev, conn.NewDefaultBind(), device.NewLogger(device.LogLevelSilent, ""))
+	dev := device.NewDevice(tdev, newBind(), device.NewLogger(device.LogLevelSilent, ""))
 	endpoint := netip.AddrPortFrom(ip, uint16(port))
 	cfg := fmt.Sprintf("private_key=%s\npublic_key=%s\nendpoint=%s\nallowed_ip=%s/128\npersistent_keepalive_interval=25\n",
 		priv.hex(), serverPub.hex(), endpoint, ServerAddr)

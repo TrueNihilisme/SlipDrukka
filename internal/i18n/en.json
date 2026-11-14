@@ -1,4 +1,11 @@
 {
+"Служба працює з правами SYSTEM: перевести її на обмежений обліковий запис не вдалося. Причина — в журналі.": "The service is running with SYSTEM rights: switching it to its limited account failed. The reason is in the log.",
+"перезапуск служби не настав за %v — працюю далі під поточним обліковим записом": "the service was not restarted within %v — carrying on under the current account",
+"сервер надіслав некоректний ключ": "the server sent an invalid key",
+"ПОМИЛКА збереження власного ключа точки: %v — залишаю код підключення": "ERROR saving the shop's own key: %v — keeping the connection code",
+"сервер видав цій точці власний ключ; код підключення більше не потрібен": "the server gave this shop its own key; the connection code is no longer needed",
+"точка «%s» отримала власний ключ, її код підключення більше не діє": "shop “%s” now uses its own key; its connection code no longer works",
+"точці «%s» видано власний ключ замість коду підключення": "shop “%s” was given its own key in place of the connection code",
 "аварійний пароль з мережі вимкнено — увійдіть на самому сервері або дозвольте його в налаштуваннях панелі": "the emergency password from the network is off — sign in on the server itself or allow it in the panel settings",
 "аварійний пароль з мережі": "emergency password from the network",
 "трасування до сервера (%s): %d переходів": "trace to the server (%s): %d hops",

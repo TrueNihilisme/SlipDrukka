@@ -45,8 +45,9 @@ every few seconds.
 **More:**
 
 * **Issue a new connection code** — the old code stops working at once, the
-  shop disconnects until the new one is entered there. For when the code
-  leaked or the shop computer was replaced.
+  shop disconnects until the new one is entered there. For when the shop
+  program is reinstalled or the shop computer replaced (a code works once),
+  or when the shop's key may have leaked.
 * **Tie the code to the shop's IP** — the shop's code works only from the
   given addresses. Empty — from anywhere.
 * **Delete shop** — its printers stop printing, queued receipts are

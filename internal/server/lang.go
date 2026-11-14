@@ -15,6 +15,7 @@ func (s *Server) StateIn(lang string) StateView {
 	tr := func(x string) string { return i18n.Tr(lang, x) }
 	v.Log = s.Log.LinesIn(lang)
 	v.QueueError = tr(v.QueueError)
+	v.Warning = tr(v.Warning)
 	for i := range v.Refused {
 		v.Refused[i].Reason = tr(v.Refused[i].Reason)
 	}

@@ -167,9 +167,15 @@ func TestLocalClientCheck(t *testing.T) {
 	s.cfg.Ports["a1/p"] = port
 	s.startPortLocked("a1/p", port)
 	s.mu.Unlock()
+	// A refused connection is reset by the server, and on some systems the
+	// reset arrives before Dial returns: while connections are refused, a
+	// failed Dial is the expected outcome, not a broken test.
 	send := func() {
 		c, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port))
 		if err != nil {
+			if !allow.Load() {
+				return
+			}
 			t.Fatal(err)
 		}
 		c.Write([]byte("receipt"))

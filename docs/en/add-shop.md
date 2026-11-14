@@ -27,9 +27,19 @@ the fingerprint of the server certificate (so the shop never connects to a
 fake server) and, when enabled, the server's WireGuard key. The server keeps
 only a hash of the key.
 
+**The code works once.** At its first connection the shop program gets its
+own long-term key from the server and keeps it in its protected data folder;
+from then on the code itself is refused. A code that stayed in a chat, on a
+USB stick or in an installer log is useless after that. To reinstall the
+shop program or move it to another computer, issue a new code: "More → Issue
+a new connection code".
+
+A shop program older than 0.18.0 cannot take its own key and keeps using the
+code; update it to get this protection.
+
 **Validity.** The code must be used within the time set in
 [Settings](settings.md#protection-against-guessing-and-scanners) (7 days by
-default). Once the shop has connected, the code does not expire.
+default).
 
 ## Example
 

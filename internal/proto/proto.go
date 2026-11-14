@@ -94,6 +94,22 @@ type Hello struct {
 	Hostname  string     `json:"hostname"`
 	Printers  []Printer  `json:"printers"`
 	Inventory *Inventory `json:"inventory,omitempty"`
+	// Caps: what this point can do beyond the protocol version (0.18.0+).
+	Caps []string `json:"caps,omitempty"`
+}
+
+// CapOwnKey: the point accepts its own long-term key in Welcome.NewKey and
+// stops using its connection code (one-time codes, 0.18.0).
+const CapOwnKey = "own_key"
+
+// HasCap reports whether the point announced cap.
+func (h Hello) HasCap(c string) bool {
+	for _, x := range h.Caps {
+		if x == c {
+			return true
+		}
+	}
+	return false
 }
 
 // Inventory is what the point reports about itself: every Windows printer,
@@ -178,6 +194,10 @@ type Welcome struct {
 	// SeenAs: the address the server sees this point connecting from, i.e.
 	// its public (NAT) address (0.17.0).
 	SeenAs string `json:"seen_as,omitempty"`
+	// NewKey: the point's own long-term key, sent once when it connected with
+	// its connection code (0.18.0). The point saves it and reconnects with
+	// it; from then on the code no longer works.
+	NewKey string `json:"new_key,omitempty"`
 }
 
 // Channels a point can use.

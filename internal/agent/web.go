@@ -28,6 +28,16 @@ type StateView struct {
 	JobsOK   int             `json:"jobs_ok"`
 	JobsFail int             `json:"jobs_failed"`
 	Log      []string        `json:"log"`
+	Warning  string          `json:"warning,omitempty"` // see SetWarning
+}
+
+// SetWarning sets (or, with "", clears) the warning shown at the top of the
+// page: a problem of the service itself (it runs with LocalSystem rights
+// although it should not).
+func (a *Agent) SetWarning(text string) {
+	a.mu.Lock()
+	a.warning = text
+	a.mu.Unlock()
 }
 
 func (a *Agent) State() StateView {
@@ -37,6 +47,7 @@ func (a *Agent) State() StateView {
 	v := StateView{Status: a.status, HasCode: a.cfg.Code != "", JobsOK: a.jobs.OK, JobsFail: a.jobs.Failed,
 		Shared: append([]proto.Printer(nil), a.cfg.Shared...), Events: append([]proto.Event(nil), a.events...), Log: a.Log.Lines()}
 	v.Status.Version = a.Version
+	v.Warning = a.warning
 	v.CodeOK = codeOK
 	return v
 }
@@ -114,6 +125,7 @@ func (a *Agent) StateIn(lang string) StateView {
 		return v
 	}
 	v.Status.Error = i18n.Tr(lang, v.Status.Error)
+	v.Warning = i18n.Tr(lang, v.Warning)
 	for i := range v.Events {
 		v.Events[i].Text = i18n.Tr(lang, v.Events[i].Text)
 	}

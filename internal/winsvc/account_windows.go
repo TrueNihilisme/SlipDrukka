@@ -159,54 +159,58 @@ type Limits struct {
 	Log     func(format string, args ...any)
 }
 
-// LowerPrivileges is called by a service shortly after it started. Under
-// LocalSystem it prepares the computer, switches the service to its own
-// account and restarts it; under any other account it only reports who the
-// service runs as. Any failure leaves the service running as it is: printing
-// must never stop because rights could not be reduced.
-func LowerPrivileges(l Limits) {
+// LowerPrivileges is called by a service before it opens any port
+// (winsvc.Start). Under LocalSystem it prepares the computer, switches the
+// service to its own account and restarts it; under any other account it
+// only reports who the service runs as.
+//
+// restarting: the switch is done and the restart is on its way — the caller
+// must not start its work in this process. problem: the switch failed and
+// the service stays under LocalSystem; printing must never stop because
+// rights could not be reduced, so the caller runs anyway and shows problem
+// in the admin page (SystemWarning).
+func LowerPrivileges(l Limits) (restarting bool, problem string) {
 	if !IsLocalSystem() {
 		l.Log("служба працює від імені %s", CurrentAccount())
-		return
+		return false, ""
 	}
 	if KeepSystem(l.DataDir) {
 		l.Log("служба працює з правами SYSTEM: так вибрано командою «account system»")
-		return
+		return false, ""
 	}
-	// Let the installer see the service running, and let the service finish
-	// what it does only at start, before it is restarted.
+	// Let the installer see the service running before it is restarted.
+	// Nothing listens on the network meanwhile.
 	time.Sleep(5 * time.Second)
 	account := AccountName(l.Service)
-	fail := func(what string, err error) {
+	fail := func(what string, err error) (bool, string) {
 		l.Log("ПОМИЛКА: службу не вдалося перевести на обмежений обліковий запис (%s: %v) — працює далі з правами SYSTEM", what, err)
+		return false, SystemWarning
 	}
 	if err := SecureDir(l.DataDir, l.Service); err != nil {
-		fail("тека даних", err)
-		return
+		return fail("тека даних", err)
 	}
 	warn, err := GrantPrintAdmin(account)
 	if err != nil {
-		fail("права на друк", err)
-		return
+		return fail("права на друк", err)
 	}
 	for _, w := range warn {
 		l.Log("права на принтер не видано: %s", w)
 	}
 	if l.Prepare != nil {
 		if err := l.Prepare(); err != nil {
-			fail("підготовка", err)
-			return
+			return fail("підготовка", err)
 		}
 	}
 	_ = EnsureRecovery(l.Service)
 	if err := SetServiceAccount(l.Service, true); err != nil {
-		fail("налаштування служби", err)
-		return
+		return fail("налаштування служби", err)
 	}
 	l.Log("службу переведено на обліковий запис %s (без прав адміністратора) — перезапускаю", account)
 	if err := spawnRestart(); err != nil {
 		l.Log("перезапуск не вдався (%v) — новий обліковий запис запрацює з наступного запуску служби", err)
+		return false, SystemWarning
 	}
+	return true, ""
 }
 
 // RestartArg is the hidden command both programs accept: it restarts their
