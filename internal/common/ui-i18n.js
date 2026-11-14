@@ -168,7 +168,9 @@ const P=[
 [/^Після збереження ВІДКЛЮЧАТЬСЯ ці магазини, бо їхніх адрес немає в списку:\n\n([\s\S]+)\n\nВсе одно зберегти\?$/,m=>`After saving, these shops WILL DISCONNECT because their addresses are not on the list:\n\n${m[1]}\n\nSave anyway?`],
 ];
 function tr(s){
-  if(LANG!=='en'||!s||!/[Ѐ-ӿ]/.test(s))return s;
+  if(LANG!=='en'||!s)return s;
+  if(/[«»]/.test(s))s=s.replace(/«/g,'“').replace(/»/g,'”'); // English quotes
+  if(!/[Ѐ-ӿ]/.test(s))return s;
   if(X[s]!==undefined)return X[s];
   for(const [re,f] of P){const m=s.match(re);if(m)return f(m)}
   return s;

@@ -2,7 +2,7 @@
 
 [Українська](../uk/journal.md) · [All pages](../README.md)
 
-![The Journal window](../img/journal.jpg)
+![The Journal window](../img/en/journal.jpg)
 
 ## Admin actions
 

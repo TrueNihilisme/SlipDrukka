@@ -2,7 +2,7 @@
 
 [Українська](../uk/shops.md) · [All pages](../README.md)
 
-![The Shops window](../img/shops.jpg)
+![The Shops window](../img/en/shops.jpg)
 
 ## What it is for
 

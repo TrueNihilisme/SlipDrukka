@@ -2,7 +2,7 @@
 
 [English](../en/server-printer.md) · [Усі сторінки](../README.md)
 
-![Діалог «Принтер на сервері»](../img/server-printer.jpg)
+![Діалог «Принтер на сервері»](../img/uk/server-printer.jpg)
 
 ## Для чого
 

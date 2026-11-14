@@ -2,7 +2,7 @@
 
 [English](../en/journal.md) · [Усі сторінки](../README.md)
 
-![Вікно «Журнал»](../img/journal.jpg)
+![Вікно «Журнал»](../img/uk/journal.jpg)
 
 ## Дії адміністратора
 

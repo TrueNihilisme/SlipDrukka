@@ -6,7 +6,7 @@
 
 [English](README.md) · [Вікі](docs/README.md)
 
-![Панель сервера](docs/img/shops.jpg)
+![Панель сервера](docs/img/uk/shops.jpg)
 
 ```
 Windows Server                                   Магазин (Windows 10/11)
@@ -15,6 +15,14 @@ Windows Server                                   Магазин (Windows 10/11)
     → порт 127.0.0.1:91xx                            → USB або мережа
     → slipdrukka-server (служба)  ◄── тунель ────    магазин сам підключається
 ```
+
+## Знімки
+
+| Налаштування | Сторінка магазину |
+|---|---|
+| ![Налаштування](docs/img/uk/settings.jpg) | ![Сторінка магазину](docs/img/uk/point.jpg) |
+
+Більше, вікно за вікном, — у [вікі](docs/README.md). На знімках вигадані магазини.
 
 ## Навіщо
 

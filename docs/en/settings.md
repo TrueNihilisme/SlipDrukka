@@ -2,7 +2,7 @@
 
 [Українська](../uk/settings.md) · [All pages](../README.md)
 
-![The Settings window](../img/settings.jpg)
+![The Settings window](../img/en/settings.jpg)
 
 Each block is saved with its own button. Connected shops stay connected or
 reconnect on their own.

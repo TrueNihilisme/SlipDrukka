@@ -2,7 +2,7 @@
 
 [Українська](../uk/add-shop.md) · [All pages](../README.md)
 
-![The Add a shop dialog](../img/add-shop.jpg)
+![The Add a shop dialog](../img/en/add-shop.jpg)
 
 ## What it is for
 

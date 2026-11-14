@@ -2,7 +2,7 @@
 
 [English](../en/shops.md) · [Усі сторінки](../README.md)
 
-![Вікно «Магазини»](../img/shops.jpg)
+![Вікно «Магазини»](../img/uk/shops.jpg)
 
 ## Для чого
 

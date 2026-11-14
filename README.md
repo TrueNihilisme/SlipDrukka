@@ -7,7 +7,7 @@ back.
 
 [Українська](README.uk.md) · [Wiki](docs/README.md)
 
-![The server panel](docs/img/shops.jpg)
+![The server panel](docs/img/en/shops.jpg)
 
 ```
 Windows Server                                   Shop (Windows 10/11)
@@ -16,6 +16,14 @@ Windows Server                                   Shop (Windows 10/11)
     → port 127.0.0.1:91xx                            → USB or network
     → slipdrukka-server (service)  ◄── tunnel ────   the shop dials in itself
 ```
+
+## Screenshots
+
+| Settings | Shop page |
+|---|---|
+| ![Settings](docs/img/en/settings.jpg) | ![Shop page](docs/img/en/point.jpg) |
+
+More, window by window, in the [wiki](docs/README.md). Screenshots use made-up shops.
 
 ## Why
 

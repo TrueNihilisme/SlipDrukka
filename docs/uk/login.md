@@ -2,7 +2,7 @@
 
 [English](../en/login.md) · [Усі сторінки](../README.md)
 
-![Вхід у панель](../img/login.jpg)
+![Вхід у панель](../img/uk/login.jpg)
 
 ## Для чого
 

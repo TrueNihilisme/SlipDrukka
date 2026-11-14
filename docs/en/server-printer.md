@@ -2,7 +2,7 @@
 
 [Українська](../uk/server-printer.md) · [All pages](../README.md)
 
-![The Printer on the server dialog](../img/server-printer.jpg)
+![The Printer on the server dialog](../img/en/server-printer.jpg)
 
 ## What it is for
 

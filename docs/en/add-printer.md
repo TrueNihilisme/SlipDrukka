@@ -17,7 +17,7 @@ difference is explained on [Shops](shops.md#receipt--label-or-document)).
 
 ## Tab "Already in the shop's Windows"
 
-![Printers already in the shop](../img/add-printer.jpg)
+![Printers already in the shop](../img/en/add-printer.jpg)
 
 The shop's Windows printers that are not shared yet. Virtual ones (PDF, fax,
 OneNote) are hidden; their number is under the table. Columns: name, driver
@@ -28,7 +28,7 @@ OneNote) are hidden; their number is under the table. Columns: name, driver
 
 ## Tab "Network, by IP"
 
-![Network printer by IP](../img/add-printer-ip.jpg)
+![Network printer by IP](../img/en/add-printer-ip.jpg)
 
 Creates a Standard TCP/IP port and a Windows printer on it in the shop.
 
@@ -45,7 +45,7 @@ driver "Generic / Text Only", "Receipt / label" → "Create and share".
 
 ## Tab "USB"
 
-![The shop's USB ports](../img/add-printer-usb.jpg)
+![The shop's USB ports](../img/en/add-printer-usb.jpg)
 
 The USB printer ports (`USB001`, `USB002`…) and what is already on each. If
 Windows knows the models of connected printers, they are listed at the top.

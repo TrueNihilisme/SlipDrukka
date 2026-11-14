@@ -2,7 +2,7 @@
 
 [English](../en/point.md) · [Усі сторінки](../README.md)
 
-![Сторінка магазину](../img/point.jpg)
+![Сторінка магазину](../img/uk/point.jpg)
 
 ## Для чого
 

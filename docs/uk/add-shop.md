@@ -2,7 +2,7 @@
 
 [English](../en/add-shop.md) · [Усі сторінки](../README.md)
 
-![Діалог «Додати магазин»](../img/add-shop.jpg)
+![Діалог «Додати магазин»](../img/uk/add-shop.jpg)
 
 ## Для чого
 

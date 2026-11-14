@@ -2,7 +2,7 @@
 
 [Українська](../uk/point.md) · [All pages](../README.md)
 
-![The shop page](../img/point.jpg)
+![The shop page](../img/en/point.jpg)
 
 ## What it is for
 

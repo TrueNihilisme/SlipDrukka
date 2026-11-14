@@ -2,7 +2,7 @@
 
 [Українська](../uk/login.md) · [All pages](../README.md)
 
-![Panel sign-in](../img/login.jpg)
+![Panel sign-in](../img/en/login.jpg)
 
 ## What it is for
 
