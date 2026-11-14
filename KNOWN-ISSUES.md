@@ -16,12 +16,12 @@ What we found while testing, what was fixed and what is still open.
 | 7 | **One resilience test is flaky**: `TestResilienceStuckArrivalReleases` once failed in cleanup (`spool: directory not empty`), passed on rerun. | Probably the server still writes to the spool while the test removes it (assumption, not measured). Test-only. |
 | 8 | **The admin panel has no HTTPS.** | Matters only when it is open to the network; the emergency password from the network is off by default for this reason. Planned. |
 | 9 | **The connection code stays valid until it is re-issued.** | Planned: one-time codes (the shop gets a long-term key on first connection). Until then, re-issue a code that may have leaked. |
-| 10 | **Refusal of a program in a user session (terminal server) on the local printer ports is not measured live.** | The check is in the code (session 0 only); the test machines had no signed-in user session. |
 
 ## Fixed · Виправлено
 
 | Found | Problem | Fix |
 |---|---|---|
+| measured on a terminal server (0.17.0) | **Refusal of a program in a user session on the local printer ports was not measured live** (open item until now). | Measured: a plain PowerShell in an RDP session sent bytes to `127.0.0.1:9101`; the server refused it and logged "refused a connection to local port 127.0.0.1:9101: a program in user session #8 … Print only through a Windows printer". Nothing was printed. |
 | AI reviews (Mistral, Grok, GPT) | **The emergency password was accepted from the network** over plain HTTP when the panel was open to the LAN. | 0.17.0: from other computers only when Settings allow it (off by default), with a clear-text warning. An upgraded server that relied on it must allow it once on the server itself. |
 | AI reviews | **Sign-out and sign-in had no cross-site check**; **the shop key hash was compared with `==`**; **queue files were renamed without `fsync`** (a power cut at that moment could lose a receipt); **no Content-Security-Policy**. | 0.17.0: `X-SD` header required; constant-time compare; data synced before the rename; CSP on both pages. |
 | AI review (GPT) | **CI could write to the repository on every push**, and actions were referenced by tag. | 0.17.0: a separate release job, tags only, has write access; actions are pinned to commit SHAs. |
