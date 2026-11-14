@@ -62,6 +62,14 @@ func open() (*server.Server, error) {
 	// addresses is enforced by the server itself. Only a service the
 	// administrator left under LocalSystem, or a console run, keeps rewriting
 	// the port rule with the allowed addresses.
+	s.FirewallRead = func(names ...string) ([]server.FWRule, error) {
+		rules, err := winsvc.ReadFirewallRules(names...)
+		out := make([]server.FWRule, len(rules))
+		for i, r := range rules {
+			out[i] = server.FWRule(r)
+		}
+		return out, err
+	}
 	if winsvc.Privileged() && (!winsvc.IsService() || winsvc.KeepSystem(dir)) {
 		s.FirewallAdd = func(name, protocol string, port int, remote []string) error {
 			return winsvc.AddFirewallRule(name, protocol, port, remote...)

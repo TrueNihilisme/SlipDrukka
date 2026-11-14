@@ -24,6 +24,7 @@ package winsvc
 // out of reach, which is why they are set up before the switch.
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc/mgr"
 
+	"slipdrukka/internal/winps"
 	"slipdrukka/internal/winsys"
 )
 
@@ -221,13 +223,24 @@ func spawnRestart() error {
 	return cmd.Start()
 }
 
-// AddProgramFirewallRule (re)creates an inbound allow rule for one program,
+// AddProgramFirewallRule creates an inbound allow rule for one program,
 // whatever port it listens on. A service without administrator rights cannot
 // change firewall rules, so the rule must not depend on a port number that
 // can be changed later in the admin page.
+//
+// An existing rule is kept (0.16.0): only its program path is refreshed. The
+// administrator may have narrowed it to the points port and the shops'
+// addresses (command in the admin page, Settings); an upgrade starts the
+// service as LocalSystem again and used to recreate the rule wide open.
 func AddProgramFirewallRule(name, exe, protocol string) error {
 	netsh := winsys.Exe("netsh.exe")
-	_ = exec.Command(netsh, "advfirewall", "firewall", "delete", "rule", "name="+name).Run()
+	if exec.Command(netsh, "advfirewall", "firewall", "show", "rule", "name="+name).Run() == nil {
+		out, err := exec.Command(netsh, "advfirewall", "firewall", "set", "rule", "name="+name, "new", "program="+exe).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("брандмауер: %v: %s", err, out)
+		}
+		return nil
+	}
 	desc := "SlipDrukka: inbound " + protocol + " for the SlipDrukka service. Allowed source addresses are checked by the service itself (admin page: 'Points may connect from')."
 	out, err := exec.Command(netsh, "advfirewall", "firewall", "add", "rule", "name="+name, "description="+desc,
 		"dir=in", "action=allow", "protocol="+protocol, "program="+exe).CombinedOutput()
@@ -235,6 +248,33 @@ func AddProgramFirewallRule(name, exe, protocol string) error {
 		return fmt.Errorf("брандмауер: %v: %s", err, out)
 	}
 	return nil
+}
+
+// ReadFirewallRules reads the rules with these display names. Reading needs
+// no administrator rights. Missing rules are left out.
+func ReadFirewallRules(names ...string) ([]FirewallRule, error) {
+	var out []FirewallRule
+	for _, n := range names {
+		b, err := winps.Run(`$r = Get-NetFirewallRule -DisplayName $env:SD_RULE -ErrorAction SilentlyContinue
+if (-not $r) { '[]'; return }
+@($r | ForEach-Object {
+  $p = $_ | Get-NetFirewallPortFilter
+  [pscustomobject]@{ name = $_.DisplayName; protocol = [string]$p.Protocol; ports = @($p.LocalPort | ForEach-Object { [string]$_ }); remote = @(($_ | Get-NetFirewallAddressFilter).RemoteAddress | ForEach-Object { [string]$_ }) }
+}) | ConvertTo-Json -Compress -Depth 3`, map[string]string{"SD_RULE": n})
+		if err != nil {
+			return nil, err
+		}
+		var list []FirewallRule
+		if err := json.Unmarshal(b, &list); err != nil {
+			var one FirewallRule
+			if json.Unmarshal(b, &one) != nil {
+				return nil, fmt.Errorf("брандмауер: незрозуміла відповідь: %s", b)
+			}
+			list = []FirewallRule{one}
+		}
+		out = append(out, list...)
+	}
+	return out, nil
 }
 
 var errNotElevated = errors.New("потрібні права адміністратора")

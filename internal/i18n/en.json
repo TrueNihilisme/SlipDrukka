@@ -348,6 +348,7 @@
 "налаштування служби": "service settings",
 "службу переведено на обліковий запис %s (без прав адміністратора) — перезапускаю": "the service is switched to account %s (no administrator rights) — restarting",
 "перезапуск не вдався (%v) — новий обліковий запис запрацює з наступного запуску служби": "restart failed (%v) — the new account takes effect at the next service start",
+"брандмауер: незрозуміла відповідь: %s": "firewall: unexpected answer: %s",
 "брандмауер: %v: %s": "firewall: %v: %s",
 "потрібні права адміністратора": "administrator rights are required",
 "у дескрипторі безпеки немає списку доступу": "the security descriptor has no access list",

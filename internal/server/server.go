@@ -132,6 +132,12 @@ type Server struct {
 	// Firewall hooks, set by main on Windows; nil in tests.
 	FirewallAdd    func(name, protocol string, port int, remote []string) error
 	FirewallRemove func(name string)
+	// FirewallRead reads rules by display name (Settings tip, fwtip.go).
+	FirewallRead func(names ...string) ([]FWRule, error)
+	fwMu         sync.Mutex
+	fwAt         time.Time
+	fwRules      []FWRule
+	fwErr        error
 	// LocalClient decides whether a connection to a local printer port may
 	// deliver a job (nil error) or is refused (the error is the reason). Set
 	// by main on Windows to admit only the print spooler; nil admits all.

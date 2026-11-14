@@ -88,6 +88,9 @@ func (s *Server) routes() http.Handler {
 	m.HandleFunc("GET /api/state", g(func(w http.ResponseWriter, r *http.Request) {
 		common.JSON(w, s.StateIn(common.LangOf(w)))
 	}))
+	m.HandleFunc("GET /api/firewall", g(func(w http.ResponseWriter, r *http.Request) {
+		common.JSON(w, s.Firewall())
+	}))
 	m.HandleFunc("POST /api/lang", g(func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Lang string }
 		if err := common.ReadBody(r, &in); err != nil {

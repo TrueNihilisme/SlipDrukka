@@ -192,6 +192,11 @@ table.plain{width:100%;border-collapse:collapse;margin-top:8px}
 .panel+.panel{margin-top:0}
 #view-journal .panel{margin-bottom:18px}
 textarea.code,input.code{font-family:var(--mono);font-size:13px}
+.fwtip{margin-top:18px;padding:14px 16px;border-radius:14px;background:var(--sunk);border:1px solid rgba(242,196,107,.35)}
+.fwtip.ok{border-color:rgba(95,227,165,.35)}
+.fwtip h3{font-size:15px;margin:0 0 6px}.fwtip h3.warn{color:var(--warn,#F2C46B)}.fwtip h3.ok{color:var(--ok,#5FE3A5)}
+.fwtip pre{margin:8px 0;white-space:pre-wrap;word-break:break-all;font:12.5px/1.55 var(--mono);color:var(--ink);background:rgba(0,0,0,.25);border-radius:10px;padding:10px 12px}
+.fwtip details{margin-top:8px}.fwtip summary{cursor:pointer;color:var(--ink2);font-size:13px}
 pre.log{margin:0;white-space:pre-wrap;font:12.5px/1.6 var(--mono);color:var(--ink2);max-height:70vh;overflow:auto;background:var(--sunk);border-radius:12px;padding:12px 14px}
 
 /* modal */
@@ -302,6 +307,7 @@ ol.steps li::marker{font-weight:800;color:var(--acc)}
           <p class="small ink2" id="onlineFrom"></p>
           <div class="row actions"><button class="primary" onclick="saveAllowed()">Зберегти</button><button onclick="addOnline()">Додати адреси підключених зараз магазинів</button><span id="allowMsg"></span></div>
           <div id="refusedBox"></div>
+          <div id="fwTip"></div>
         </div>
 
         <div class="panel">
@@ -408,7 +414,7 @@ const flash=(id,ok,t)=>{$(id).innerHTML=`<span class="${ok?'msg-ok':'msg-bad'}">
 
 // ---------- login
 async function login(e){e.preventDefault();$('loginErr').textContent='';
-  try{await api('POST','/api/login',{user:$('lu').value,password:$('lp').value});$('lp').value='';hide('login');show('app');refresh()}
+  try{await api('POST','/api/login',{user:$('lu').value,password:$('lp').value});$('lp').value='';hide('login');show('app');refresh();if(view==='settings')loadFirewall()}
   catch(err){$('loginErr').textContent=err.message}}
 async function logout(){await api('POST','/api/logout');location.reload()}
 fetch('/api/hint').then(r=>r.json()).then(h=>{const t=[];
@@ -424,7 +430,7 @@ let view='shops';
 // leaving the panel.
 const VIEWS=['shops','settings','journal'];
 document.querySelectorAll('nav.views button').forEach(b=>b.onclick=()=>go(b.dataset.view));
-function setView(v){view=v;document.querySelectorAll('nav.views button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+function setView(v){if(v==='settings'&&view!=='settings')loadFirewall();view=v;document.querySelectorAll('nav.views button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
   VIEWS.forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v))}
 function go(v){const h=v==='shops'?location.pathname+location.search:'#'+v;
   // A window still open: its history step becomes this section (history.back() here would
@@ -764,14 +770,28 @@ $('status').addEventListener('click',async e=>{
   const ok=e.target.closest('button[data-alert-ok]'),pin=e.target.closest('button[data-alert-pin]');if(!ok&&!pin)return;
   const id=(ok||pin).dataset.alertOk||(ok||pin).dataset.alertPin;const al=(S.alerts||[]).find(x=>x.id===id);if(!al)return;
   try{if(pin)await api('POST','/api/agents/'+al.agent+'/allowed',{allowed:al.ip});await api('POST','/api/alerts/dismiss',{id});refresh()}catch(err){alert(err.message)}});
+// Firewall tip (Settings): the service cannot change firewall rules itself
+// (no administrator rights), so the administrator gets one command to run.
+async function loadFirewall(){let f;try{f=await api('GET','/api/firewall')}catch(e){return}
+  const box=$('fwTip');const cmd=(t,id)=>`<pre id="${id}">${esc(t)}</pre><button onclick="copyText($('${id}').textContent,this)">Копіювати</button>`;
+  let h='',cls='fwtip';
+  if(f.restricted&&!f.missing.length){cls+=' ok';h+=`<h3 class="ok">Брандмауер обмежено: порт ${f.port}, адрес: ${f.addresses.length}</h3><p class="small ink2">Правило пускає до порту магазинів лише їхні адреси. Додали магазин або змінилась його адреса — запустіть команду ще раз.</p>`}
+  else if(f.restricted){h+=`<h3 class="warn">Нових адрес магазинів немає в правилі брандмауера</h3><p class="small ink2">Не пропустить: ${f.missing.map(esc).join(', ')}. Запустіть команду ще раз у PowerShell від імені адміністратора.</p>`}
+  else{h+=`<h3 class="warn">Порада: обмежте правило брандмауера</h3><p class="small ink2">Зараз правило брандмауера пускає до програми з будь-якої адреси, а чужих відсіює вже сама програма. Служба працює без прав адміністратора і змінювати брандмауер не може. Для кращої безпеки обмежте правило портом магазинів (${f.port}) і їхніми адресами: запустіть команду в PowerShell від імені адміністратора.</p>`}
+  if(f.command)h+=cmd(f.command,'fwCmd')+`<p class="small ink2">Адреси — ті, що вказані в панелі, і ті, з яких магазини вже підключались. Магазин з іншої адреси брандмауер не пустить: якщо в магазину змінюється адреса, додайте її тут і повторіть команду.</p>`;
+  else h+=`<p class="small ink2">Команда з'явиться, коли перший магазин підключиться або коли ви вкажете дозволені адреси.</p>`;
+  if(f.web_lan)h+=`<p class="small ink2">Панель відкрита для мережі (порт ${f.web_port}). Після обмеження з інших комп'ютерів вона не відкриється: для неї потрібне окреме правило.</p>`;
+  h+=`<details><summary>Повернути як було (будь-який порт і адреса)</summary>${cmd(f.revert,'fwRev')}</details>`;
+  if(f.error&&f.rules.length===0&&!/Windows/.test(f.error))h+=`<p class="small ink2">Не вдалося прочитати правила: ${esc(f.error)}</p>`;
+  box.className=cls;box.innerHTML=h}
 async function saveAllowed(force){
-  try{await api('POST','/api/allowed',{allowed:$('allowed').value,force:!!force});touched.allowed=false;flash('allowMsg',true,'Збережено');refresh()}
+  try{await api('POST','/api/allowed',{allowed:$('allowed').value,force:!!force});touched.allowed=false;flash('allowMsg',true,'Збережено');refresh();loadFirewall()}
   catch(e){if(e.status===409){if(confirm('Після збереження ВІДКЛЮЧАТЬСЯ ці магазини, бо їхніх адрес немає в списку:\n\n'+(e.data.would_drop||[]).join('\n')+'\n\nВсе одно зберегти?'))return saveAllowed(true);return}
     flash('allowMsg',false,e.message)}}
 
 document.querySelectorAll('[data-help]').forEach(x=>{const[p,a]=x.dataset.help.split('#');x.outerHTML=help(p,a)});
 $('loginHelp').innerHTML=help('login');
-(async()=>{try{await api('GET','/api/state');show('app');refresh()}catch(e){show('login')}
+(async()=>{try{await api('GET','/api/state');show('app');refresh();if(view==='settings')loadFirewall()}catch(e){show('login')}
   setInterval(()=>{if(!$('app').classList.contains('hidden')&&$('modal').classList.contains('hidden'))refresh()},4000)})();
 </script>
 </body>

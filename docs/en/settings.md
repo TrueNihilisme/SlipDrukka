@@ -36,6 +36,28 @@ only to the port for shops; the panel and RDP are not affected.
 shops connected now" → "Save". The server's port now ignores everyone but
 these three.
 
+### Narrow the firewall rule (tip)
+
+The list above is checked by the program itself. Windows Firewall still lets
+anyone reach it: the service runs without administrator rights and cannot
+change the firewall (on purpose, so that a compromised program cannot
+reconfigure the server's network). For the firewall to turn strangers away,
+a tip under the list gives a ready command. The administrator runs it in
+**PowerShell as administrator**:
+
+* the command narrows both program rules (`SlipDrukka Server`, TCP, and
+  `SlipDrukka Server WireGuard`, UDP) to the shops port and to the addresses
+  set in this list, in the shops, and those shops have connected from;
+* the panel shows the state: "Firewall narrowed", or which shop addresses
+  are not in the rule yet; then run the command again;
+* an upgrade keeps the narrowed rule (since 0.16.0);
+* "Undo" is a command that opens the rule to any port and address again.
+
+The firewall will not let a shop in from any other address. If a shop has a
+dynamic address, add the new one and run the command again, or leave the
+rule as it is. If the panel is open to the network, it needs a rule of its
+own once this one is narrowed.
+
 ## WireGuard channel
 
 An extra protected channel to the shops, built into the program. No adapter

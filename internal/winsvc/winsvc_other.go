@@ -19,6 +19,7 @@ func SecureDir(dir, _ string) error                        { return os.MkdirAll(
 func AddFirewallRule(string, string, int, ...string) error { return nil }
 func AddProgramFirewallRule(string, string, string) error  { return nil }
 func RemoveFirewallRule(string)                            {}
+func ReadFirewallRules(...string) ([]FirewallRule, error)  { return nil, errNotWindows }
 func SetAutostart(string, string) error                    { return errNotWindows }
 func RemoveAutostart(string)                               {}
 
