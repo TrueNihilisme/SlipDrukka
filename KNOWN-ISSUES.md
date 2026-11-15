@@ -14,6 +14,7 @@ What we found while testing, what was fixed and what is still open.
 | 5 | **Shop program runs on Windows only.** | macOS, Linux and Android shop programs are planned: same job protocol, a printing back-end per system. |
 | 6 | **Document mode needs Windows at the shop** (XPS through the printer's own driver). | Receipt / label mode does not. |
 | 7 | **The admin panel has no HTTPS.** | Matters only when it is open to the network; the emergency password from the network is off by default for this reason. Planned. |
+| 9 | **"Paper size for everyone": the reset command for a user whose registry Windows has already unloaded was measured only in parts.** Measured on Windows 11 with the Xprinter XP-420B driver: the command resets users whose registry is loaded (one with a running program, one signed out 5 minutes before: Windows still kept it loaded), and both then print with the size for everyone; its load / delete / unload steps work on a saved copy of a user's registry and leave nothing loaded. Not measured: the whole command on a profile that was really unloaded. | The size itself is written by the service (measured on Windows Server 2019 and Windows 11). |
 | 8 | **Flaky test `TestManageAndWatch`**: "session shutdown" on the first command to the shop (measured on 0.18.0: 1 of 15 runs of the end-to-end tests; 0 of 15 on 0.18.1, which does not show it is gone). | Test-only as far as known; cause not investigated. |
 
 ## Fixed · Виправлено

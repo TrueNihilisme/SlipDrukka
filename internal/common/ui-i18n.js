@@ -30,7 +30,12 @@ const X={
 'немає зв\'язку':'offline','Захищений тунель WireGuard усередині програми':'Protected WireGuard tunnel inside the program',"Звичайне з'єднання TLS":'Regular TLS connection',
 'Друк з програми':'Printing from programs','Друкує в магазині':'Prints in the shop','Підключення':'Connection','Що друкує':'What it prints','Стан':'State',
 'Чек / етикетка':'Receipt / label','Документ':'Document','Що друкує цей принтер':'What this printer prints',
-'Перейменувати принтер на сервері':'Rename the printer on the server','Перейменувати принтер у магазині':'Rename the printer in the shop','Змінити IP-адресу принтера':"Change the printer's IP address",
+'Перейменувати принтер на сервері':'Rename the printer on the server','розмір паперу':'paper size','Розмір паперу для всіх':'Paper size for everyone',
+'Розмір етикетки або чека, яким друкуватиме на цьому принтері кожен користувач сервера. Нікому не доведеться задавати його у своїх налаштуваннях друку.':'The label or receipt size every user of the server will print with on this printer. Nobody has to set it in their own printing preferences.',
+'Ширина, мм':'Width, mm','Висота, мм':'Height, mm','Застосувати всім':'Apply to everyone','записую…':'writing…','Записано':'Written',
+'Якщо в когось лишився старий розмір':'If someone still has the old size',
+'Користувач, який раніше сам зберіг налаштування цього принтера, друкує ними й далі. Щоб усі перейшли на розмір для всіх, запустіть цю команду в PowerShell від імені адміністратора на сервері. Вона стирає лише збережені налаштування цього принтера в кожного користувача.':'A user who saved settings for this printer earlier keeps printing with them. To move everyone to the size for everyone, run this command in PowerShell as an administrator on the server. It removes only the saved settings of this printer for each user.',
+'Програма не робить цього сама: її служба працює без прав адміністратора і не має доступу до налаштувань користувачів.':"The program does not do this itself: its service runs without administrator rights and has no access to users' settings.",'Перейменувати принтер у магазині':'Rename the printer in the shop','Змінити IP-адресу принтера':"Change the printer's IP address",
 'Створити принтер на сервері':'Create printer on the server','Мережа':'Network','мережа, WSD':'network, WSD',
 'друкує':'printing','готовий':'ready','не друкує':'not printing','не видано':'not shared','немає принтера на сервері':'no printer on the server',"магазин не на зв'язку":'shop offline',
 'ще нічого не друкував':'nothing printed yet','Прибрати':'Remove','Звільнити порт':'Free the port','поставити Generic':'set Generic',
@@ -138,6 +143,7 @@ const X={
 "Звичайний порт для магазинів буде закрито. Магазини, де UDP не проходить, втратять зв'язок. Продовжити?":'The regular port for shops will be closed. Shops where UDP does not get through will lose the connection. Continue?',
 };
 const P=[
+[/^папір для всіх: (\S+) × (\S+) мм$/,m=>`paper for everyone: ${m[1]} × ${m[2]} mm`],
 [/^(\d+) з (\d+) (?:магазину|магазинів) на зв'язку, (\d+) (?:принтер|принтери|принтерів), (.+)\.$/,(m)=>`${m[1]} of ${m[2]} ${m[2]==1?'shop':'shops'} connected, ${m[3]} ${m[3]==1?'printer':'printers'}, ${tr(m[4])}.`],
 [/^(\d+) (?:чек у черзі|чеки в черзі|чеків у черзі)$/,m=>`${m[1]} ${m[1]==1?'receipt':'receipts'} in queue`],
 [/^(\d+) (?:чек чекає|чеки чекають|чеків чекають)$/,m=>`${m[1]} ${m[1]==1?'receipt':'receipts'} waiting`],

@@ -48,6 +48,41 @@ The stall's XP-58 receipt printer has been shared.
 3. "Create printer". In the program on the server the cashier picks
    "Market, stall 7 XP-58" — and the receipt comes out at the stall.
 
+## Paper size for everyone
+
+A label printer's driver keeps the label size in the printing preferences,
+and Windows stores those separately for every user. On a server many people
+work on, each of them would have to set the size.
+
+The **"paper size"** button under the printer's name on the server (for
+"Receipt / label" mode) writes the size once for everyone:
+
+1. Enter the width and height in millimetres, for example 40 and 25.
+2. "Apply to everyone". "paper for everyone: 40 × 25 mm" appears under the
+   printer's name.
+
+From then on every user of the server who has not touched this printer's
+preferences, and every new user, prints with this size.
+
+**If someone still has the old size.** A user who saved preferences for this
+printer earlier keeps printing with them: Windows keeps them in that user's
+own registry. The same window has a ready command: run it in PowerShell as
+an administrator on the server, and it removes the saved preferences of this
+printer for every user, including those who are not signed in. It does not
+touch other printers or other settings. The program does not do this itself:
+its service runs without administrator rights.
+
+Worth knowing:
+
+* If the driver does not take the size, the panel says so and the settings
+  stay as they were.
+* The driver may print a little narrower than the size given. Measured with
+  the Xprinter XP-420B driver: for a 40 × 25 mm label it sends the printer a
+  width of 36 mm, because it keeps 2 mm clear on each side. It does the same
+  when the size is set by hand.
+* Only the paper size is written. Density, speed and the gap between labels
+  are set in the printer's properties, as before.
+
 ## Notes
 
 * ✎ next to the name renames the printer on the server. Programs remember

@@ -340,6 +340,32 @@ func (s *Server) routes() http.Handler {
 		s.record(r, "", "перейменовано принтер Windows", in.Old+" → "+in.New)
 		common.JSON(w, map[string]bool{"ok": true})
 	}))
+	m.HandleFunc("POST /api/queue/paper", g(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Queue  string  `json:"queue"`
+			Width  float64 `json:"width"`
+			Length float64 `json:"length"`
+		}
+		if err := common.ReadBody(r, &in); err != nil {
+			common.JSONError(w, http.StatusBadRequest, "некоректний запит")
+			return
+		}
+		got, err := s.SetQueuePaper(in.Queue, in.Width, in.Length)
+		if err != nil {
+			common.JSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		s.record(r, "", "задано розмір паперу для всіх", in.Queue+": "+mmText(got.Width)+" × "+mmText(got.Length)+" мм")
+		common.JSON(w, got)
+	}))
+	m.HandleFunc("GET /api/queue/paper-reset", g(func(w http.ResponseWriter, r *http.Request) {
+		cmd, err := s.PaperResetCommand(r.URL.Query().Get("queue"))
+		if err != nil {
+			common.JSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		common.JSON(w, map[string]string{"command": cmd})
+	}))
 	m.HandleFunc("DELETE /api/jobs/{id}", g(func(w http.ResponseWriter, r *http.Request) {
 		if err := s.CancelJob(r.PathValue("id")); err != nil {
 			common.JSONError(w, http.StatusBadRequest, err.Error())

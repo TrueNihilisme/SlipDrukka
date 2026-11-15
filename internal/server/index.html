@@ -593,7 +593,7 @@ function connCell(a,p){
 
 function rowHTML(a,ai,p,pi){
   const st=routeState(a,p),q=p.queues||[];
-  const srv=q.length?q.map((x,qi)=>`<div class="q"><span class="name">${esc(x.name)}</span> <button class="icon" title="Перейменувати принтер на сервері" data-act="qren" data-a="${ai}" data-p="${pi}" data-q="${qi}">✎</button><small>${esc(x.driver)}</small></div>`).join('')
+  const srv=q.length?q.map((x,qi)=>`<div class="q"><span class="name">${esc(x.name)}</span> <button class="icon" title="Перейменувати принтер на сервері" data-act="qren" data-a="${ai}" data-p="${pi}" data-q="${qi}">✎</button><small>${esc(x.driver)}</small>${p.mode?'':`${x.paper?`<small>папір для всіх: ${x.paper.width/10} × ${x.paper.length/10} мм</small>`:''}<small><button class="quiet" style="padding:0" data-act="qpaper" data-a="${ai}" data-p="${pi}" data-q="${qi}">розмір паперу</button></small>`}</div>`).join('')
     :(p.offered&&a.online?`<button data-act="queue" data-a="${ai}" data-p="${pi}">Створити принтер на сервері</button>`:'<span class="mute">—</span>');
   let shop;
   if(!p.offered)shop=`<span class="ink2">не видано</span><small>порт закріплено за ним, доки його не звільнять</small>`;
@@ -701,6 +701,7 @@ $('shops').addEventListener('click',async e=>{
   case 'sren':{const v=prompt('Нова назва принтера у Windows магазину:',p.name);if(v&&v!==p.name){busy=true;try{await cmd(a,'rename_printer',{old:p.name,new:v})}finally{busy=false}}break}
   case 'qren':{const q=p.queues[+b.dataset.q];const v=prompt('Нова назва принтера на сервері.\n\nУвага: програми запам\'ятовують принтер за назвою, після перейменування в них треба буде вибрати принтер знову.',q.name);
     if(v&&v!==q.name)await api('POST','/api/queue/rename',{old:q.name,new:v});break}
+  case 'qpaper':openPaper(p.queues[+b.dataset.q]);return;
   case 'queue':openQueue(a,p);return;
   case 'add':openAdd(a);return;
   }}catch(err){if(err.message!=='login')alert(err.message)}
@@ -722,6 +723,28 @@ function openAddShop(){
 
 // ---------- create a Windows printer on the server
 let serverDrivers=null;
+// Paper size for everyone: the service writes it into the queue's settings
+// for all users; settings users saved themselves are reset by a command the
+// administrator runs (the service has no access to users' registries).
+async function openPaper(q){
+  const cur=q.paper?[q.paper.width/10,q.paper.length/10]:['',''];
+  modal(modalHead('Розмір паперу для всіх','server-printer')+`<p style="margin-top:0"><b>${esc(q.name)}</b></p>
+    <p class="ink2">Розмір етикетки або чека, яким друкуватиме на цьому принтері кожен користувач сервера. Нікому не доведеться задавати його у своїх налаштуваннях друку.</p>
+    <div class="row"><div><label class="f" for="pW">Ширина, мм</label><input id="pW" type="number" min="5" max="1000" step="0.1" value="${cur[0]}" style="width:120px"></div>
+      <div><label class="f" for="pL">Висота, мм</label><input id="pL" type="number" min="5" max="1000" step="0.1" value="${cur[1]}" style="width:120px"></div></div>
+    <div class="row actions" style="margin-top:16px"><button class="primary" id="pGo">Застосувати всім</button><span id="pMsg"></span></div>
+    <div id="pReset"></div>`);
+  $('pGo').onclick=async()=>{$('pMsg').textContent='записую…';
+    try{const r=await api('POST','/api/queue/paper',{queue:q.name,width:+$('pW').value,length:+$('pL').value});
+      $('pW').value=r.width;$('pL').value=r.length;flash('pMsg',true,'Записано');refresh()}
+    catch(e){flash('pMsg',false,e.message)}};
+  try{const r=await api('GET','/api/queue/paper-reset?queue='+encodeURIComponent(q.name));
+    $('pReset').innerHTML=`<h3 style="font-size:15px;margin-top:20px">Якщо в когось лишився старий розмір</h3>
+      <p class="small ink2">Користувач, який раніше сам зберіг налаштування цього принтера, друкує ними й далі. Щоб усі перейшли на розмір для всіх, запустіть цю команду в PowerShell від імені адміністратора на сервері. Вона стирає лише збережені налаштування цього принтера в кожного користувача.</p>
+      <pre id="pCmd">${esc(r.command)}</pre><button onclick="copyText($('pCmd').textContent,this)">Копіювати</button>
+      <p class="small ink2">Програма не робить цього сама: її служба працює без прав адміністратора і не має доступу до налаштувань користувачів.</p>`}
+  catch(e){}
+}
 async function openQueue(a,p){
   modal(modalHead('Принтер на сервері','server-printer')+`<p class="ink2" style="margin-top:0">${p.mode==='xps'
       ?'Режим «Документ»: на сервері ставиться Microsoft XPS Document Writer v4, а друкує рідний драйвер у магазині. Користувачі бачать лише назву.'

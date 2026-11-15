@@ -3,7 +3,10 @@
 // printer unchanged.
 package winprint
 
-import "io"
+import (
+	"errors"
+	"io"
+)
 
 // PrinterInfo describes one printer installed in Windows.
 type PrinterInfo struct {
@@ -13,6 +16,17 @@ type PrinterInfo struct {
 	Status uint32 `json:"status"`
 	Jobs   uint32 `json:"jobs"`
 }
+
+// Paper is a paper size in a printer's settings: Kind is the Windows paper
+// number (256 = a custom size), Width and Length are tenths of a millimetre.
+type Paper struct {
+	Kind   int `json:"kind"`
+	Width  int `json:"width"`
+	Length int `json:"length"`
+}
+
+// ErrPaperRejected: the printer's driver does not take this paper size.
+var ErrPaperRejected = errors.New("winprint: the driver rejected the paper size")
 
 // Spooler is what the agent needs from the OS. Tests use a fake.
 type Spooler interface {

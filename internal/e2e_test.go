@@ -27,6 +27,10 @@ func (noAdmin) QueuesByPort() (map[string][]server.Queue, error) {
 }
 func (noAdmin) CreateQueue(string, string, string, int) error { return nil }
 func (noAdmin) RenameQueue(string, string) error              { return nil }
+func (noAdmin) QueuePaper(string) (winprint.Paper, error)     { return winprint.Paper{}, nil }
+func (noAdmin) SetQueuePaper(string, int, int) (winprint.Paper, error) {
+	return winprint.Paper{}, nil
+}
 
 func freePort(t *testing.T) int {
 	l, err := net.Listen("tcp", "127.0.0.1:0")

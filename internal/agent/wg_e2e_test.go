@@ -21,6 +21,10 @@ func (wgNoAdmin) QueuesByPort() (map[string][]server.Queue, error) {
 }
 func (wgNoAdmin) CreateQueue(string, string, string, int) error { return nil }
 func (wgNoAdmin) RenameQueue(string, string) error              { return nil }
+func (wgNoAdmin) QueuePaper(string) (winprint.Paper, error)     { return winprint.Paper{}, nil }
+func (wgNoAdmin) SetQueuePaper(string, int, int) (winprint.Paper, error) {
+	return winprint.Paper{}, nil
+}
 
 // a port free for both TCP and UDP
 func freeBoth(t *testing.T) int {

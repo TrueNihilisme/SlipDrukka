@@ -8,11 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
 	"slipdrukka/internal/proto"
+	"slipdrukka/internal/winprint"
 )
 
 const maxServerEvents = 50
@@ -228,4 +231,102 @@ func (s *Server) RenameQueue(old, newName string) error {
 	s.qMu.Unlock()
 	s.Log.Printf("принтер сервера «%s» перейменовано на «%s»", old, newName)
 	return nil
+}
+
+// Paper size for everyone.
+//
+// A label printer's driver keeps the label size in the printer's settings,
+// and Windows keeps those per user: on a server with many users each of them
+// would have to set the size by hand. The service writes the size into the
+// queue's default settings for all users instead (measured: its account may
+// do that on the queues it manages; users without settings of their own, and
+// new users, get the size at once).
+//
+// Users who already saved settings of their own keep them: Windows stores
+// those in each user's registry, where the service has no access. For them
+// the panel shows the administrator a command (PaperResetCommand), as it
+// does for the firewall, instead of giving the service more rights.
+
+// PaperSet is the answer to SetQueuePaper, in millimetres.
+type PaperSet struct {
+	Width  float64 `json:"width"`
+	Length float64 `json:"length"`
+}
+
+const (
+	paperMinMM = 5
+	paperMaxMM = 1000
+)
+
+func mmText(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
+
+// ourQueue: the Windows printer uses one of this program's ports.
+func (s *Server) ourQueue(name string) bool {
+	q, err := s.queues()
+	if err != nil {
+		return false
+	}
+	for _, list := range q {
+		for _, x := range list {
+			if x.Name == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// SetQueuePaper writes the paper size (millimetres) into the default
+// settings for all users of a Windows printer on this server.
+func (s *Server) SetQueuePaper(queue string, widthMM, lengthMM float64) (PaperSet, error) {
+	if !s.ourQueue(queue) {
+		return PaperSet{}, errors.New("такого принтера на сервері немає")
+	}
+	ok := func(v float64) bool { return v >= paperMinMM && v <= paperMaxMM } // false for NaN too
+	if !ok(widthMM) || !ok(lengthMM) {
+		return PaperSet{}, fmt.Errorf("розмір паперу: від %d до %d мм", paperMinMM, paperMaxMM)
+	}
+	got, err := s.admin.SetQueuePaper(queue, int(math.Round(widthMM*10)), int(math.Round(lengthMM*10)))
+	if errors.Is(err, winprint.ErrPaperRejected) {
+		return PaperSet{}, errors.New("драйвер цього принтера не приймає такий розмір паперу")
+	}
+	if err != nil {
+		return PaperSet{}, fmt.Errorf("не вдалося записати розмір паперу: %w", err)
+	}
+	s.qMu.Lock()
+	s.qCache = nil
+	s.qMu.Unlock()
+	res := PaperSet{Width: float64(got.Width) / 10, Length: float64(got.Length) / 10}
+	s.Log.Printf("принтеру сервера «%s» задано розмір паперу для всіх користувачів: %s × %s мм", queue, mmText(res.Width), mmText(res.Length))
+	return res, nil
+}
+
+// PaperResetCommand is the PowerShell command an administrator runs to make
+// every user forget the settings they saved for the queue, so that the size
+// for everyone applies to them too. It deletes the queue's entry from two
+// places in each user's registry (measured: that is where Windows keeps
+// them); the registry of a user who is not signed in is loaded for that and
+// unloaded again.
+func (s *Server) PaperResetCommand(queue string) (string, error) {
+	if !s.ourQueue(queue) {
+		return "", errors.New("такого принтера на сервері немає")
+	}
+	return paperResetCommand(queue), nil
+}
+
+func paperResetCommand(queue string) string {
+	return "$q = " + psQuote(queue) + `
+Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special } | ForEach-Object {
+  $hive = "HKU\" + $_.SID; $loaded = $false
+  if (-not (Test-Path ("Registry::HKEY_USERS\" + $_.SID))) {
+    $hive = "HKU\sd_" + $_.SID
+    & reg.exe load $hive (Join-Path $_.LocalPath 'NTUSER.DAT') 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) { return }
+    $loaded = $true
+  }
+  foreach ($k in 'DevModePerUser', 'DevModes2') {
+    & reg.exe delete "$hive\Printers\$k" /v $q /f 2>$null | Out-Null
+  }
+  if ($loaded) { & reg.exe unload $hive | Out-Null }
+}`
 }

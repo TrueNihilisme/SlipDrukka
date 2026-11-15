@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"runtime"
 
+	"slipdrukka/internal/winprint"
 	"slipdrukka/internal/winps"
 )
 
@@ -13,6 +14,11 @@ type Admin interface {
 	QueuesByPort() (map[string][]Queue, error) // port name -> queues on it
 	CreateQueue(queue, driver, portName string, port int) error
 	RenameQueue(old, new string) error
+	// QueuePaper reads, SetQueuePaper writes the paper size in a queue's
+	// default settings for all users (tenths of a millimetre). The driver
+	// may change what it is given; SetQueuePaper returns what it accepted.
+	QueuePaper(queue string) (winprint.Paper, error)
+	SetQueuePaper(queue string, width, length int) (winprint.Paper, error)
 }
 
 // PowerShellAdmin uses the PrintManagement module (see winps).
@@ -26,6 +32,9 @@ func (PowerShellAdmin) Drivers() ([]string, error) { return winps.Drivers() }
 type Queue struct {
 	Name   string `json:"name"`
 	Driver string `json:"driver"`
+	// Paper: the paper size in the queue's default settings for all users,
+	// when Windows gives one.
+	Paper *winprint.Paper `json:"paper,omitempty"`
 }
 
 func (PowerShellAdmin) QueuesByPort() (map[string][]Queue, error) {
@@ -51,6 +60,14 @@ func (PowerShellAdmin) QueuesByPort() (map[string][]Queue, error) {
 }
 
 func (PowerShellAdmin) RenameQueue(old, new string) error { return winps.RenamePrinter(old, new) }
+
+func (PowerShellAdmin) QueuePaper(queue string) (winprint.Paper, error) {
+	return winprint.GlobalPaper(queue)
+}
+
+func (PowerShellAdmin) SetQueuePaper(queue string, width, length int) (winprint.Paper, error) {
+	return winprint.SetGlobalPaper(queue, width, length)
+}
 
 func (PowerShellAdmin) CreateQueue(queue, driver, portName string, port int) error {
 	_, err := ps(`

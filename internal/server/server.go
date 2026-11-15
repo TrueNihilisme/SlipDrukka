@@ -1097,6 +1097,13 @@ func (s *Server) queues() (map[string][]Queue, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, list := range q {
+		for i := range list {
+			if p, err := s.admin.QueuePaper(list[i].Name); err == nil && p.Width > 0 && p.Length > 0 {
+				list[i].Paper = &p
+			}
+		}
+	}
 	s.qCache, s.qAt = q, time.Now()
 	return q, nil
 }

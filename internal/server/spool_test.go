@@ -1,12 +1,14 @@
 package server
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"slipdrukka/internal/common"
+	"slipdrukka/internal/winprint"
 )
 
 type nopAdmin struct{}
@@ -15,6 +17,12 @@ func (nopAdmin) Drivers() ([]string, error)                    { return nil, nil
 func (nopAdmin) QueuesByPort() (map[string][]Queue, error)     { return nil, nil }
 func (nopAdmin) CreateQueue(string, string, string, int) error { return nil }
 func (nopAdmin) RenameQueue(string, string) error              { return nil }
+func (nopAdmin) QueuePaper(string) (winprint.Paper, error) {
+	return winprint.Paper{}, errors.New("no paper")
+}
+func (nopAdmin) SetQueuePaper(string, int, int) (winprint.Paper, error) {
+	return winprint.Paper{}, errors.New("no paper")
+}
 
 // Jobs older than the TTL are dropped instead of printed late; jobs on disk
 // are picked up again after a restart.
