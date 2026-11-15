@@ -194,6 +194,7 @@
 "УВАГА: файлів сертифіката не було, створено новий сертифікат сервера (відбиток %s). Коди й ключі магазинів, видані раніше, більше не підходять: кожному магазину треба видати новий код підключення": "WARNING: the certificate files were missing, a new server certificate was made (fingerprint %s). Codes and keys issued to shops before no longer fit: every shop needs a new connection code",
 "створено сертифікат сервера (відбиток %s)": "server certificate created (fingerprint %s)",
 "ключ WireGuard: %w": "WireGuard key: %w",
+"ПОМИЛКА: файл ключа WireGuard (wg.key у теці %s) не читається або пошкоджений, сервер не запускається: %v. Поверніть файл з копії або видаліть його, тоді сервер створить новий ключ": "ERROR: the WireGuard key file (wg.key in folder %s) cannot be read or is damaged, the server does not start: %v. Restore the file from a copy or delete it, then the server will make a new key",
 "черга: %w": "queue: %w",
 "порт для точок %s: %w": "port for shops %s: %w",
 "сервер %s слухає точки на %s (TCP)": "server %s listens for shops on %s (TCP)",

@@ -278,6 +278,7 @@ func New(dir string, log *common.LogRing, admin Admin) (*Server, error) {
 		}
 	}
 	if s.wgKey, err = loadWGKey(dir); err != nil {
+		log.Printf("ПОМИЛКА: файл ключа WireGuard (wg.key у теці %s) не читається або пошкоджений, сервер не запускається: %v. Поверніть файл з копії або видаліть його, тоді сервер створить новий ключ", dir, err)
 		return nil, fmt.Errorf("ключ WireGuard: %w", err)
 	}
 	if err := s.loadSpoolLocked(); err != nil {
@@ -633,6 +634,12 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, rele
 		}
 	}
 	expired := ac != nil && s.codeExpiredLocked(ac, time.Now())
+	// Read here, under the lock: the panel can rename the point or give it
+	// a new code while this connection is being served.
+	var name, acWG string
+	if ac != nil {
+		name, acWG = ac.Name, ac.WGPub
+	}
 	s.mu.Unlock()
 	if ac == nil {
 		if banned {
@@ -652,11 +659,11 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, rele
 		}
 		refuse("код підключення протермінований — видайте точці новий код у панелі сервера")
 		if peer == nil {
-			s.noteFail(ip, "протермінований код точки «"+ac.Name+"»", csExpiredCode)
+			s.noteFail(ip, "протермінований код точки «"+name+"»", csExpiredCode)
 		}
 		return
 	}
-	wantWG := ac.WGPub
+	wantWG := acWG
 	if usedPending {
 		wantWG = wgtun.PointPublic(hello.Key).String()
 	}
@@ -669,7 +676,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, rele
 			drop()
 			return
 		}
-		s.noteRefused(ip, "точка «"+ac.Name+"»: код дозволено лише з інших адрес")
+		s.noteRefused(ip, "точка «"+name+"»: код дозволено лише з інших адрес")
 		refuse("код цієї точки не дозволено з адреси " + ip.String())
 		return
 	}
@@ -689,7 +696,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, rele
 	wgPub := s.welcomeWGLocked()
 	s.mu.Unlock()
 	via := viaName(peer)
-	if err := proto.WriteLine(c, proto.Welcome{OK: true, Name: ac.Name, WireGuard: wgPub, Via: via, Lang: s.logLang(), SeenAs: ip.String(), NewKey: newKey}); err != nil {
+	if err := proto.WriteLine(c, proto.Welcome{OK: true, Name: name, WireGuard: wgPub, Via: via, Lang: s.logLang(), SeenAs: ip.String(), NewKey: newKey}); err != nil {
 		c.Close()
 		return
 	}
@@ -714,9 +721,9 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, rele
 	}
 	s.mu.Unlock()
 	if peer != nil {
-		s.Log.Printf("точка «%s» підключилась з %s через WireGuard (%s, %d принтер(и))", ac.Name, remote, hello.Hostname, len(printers))
+		s.Log.Printf("точка «%s» підключилась з %s через WireGuard (%s, %d принтер(и))", name, remote, hello.Hostname, len(printers))
 	} else {
-		s.Log.Printf("точка «%s» підключилась з %s (%s, %d принтер(и))", ac.Name, remote, hello.Hostname, len(printers))
+		s.Log.Printf("точка «%s» підключилась з %s (%s, %d принтер(и))", name, remote, hello.Hostname, len(printers))
 	}
 	s.noteEvents(ac.ID, hello.Inventory)
 	s.wake(ac.ID) // deliver whatever waited for this point
@@ -740,7 +747,7 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, rele
 		delete(s.online, ac.ID)
 	}
 	s.mu.Unlock()
-	s.Log.Printf("точка «%s» відключилась", ac.Name)
+	s.Log.Printf("точка «%s» відключилась", name)
 }
 
 func portKey(agentID, alias string) string { return agentID + "/" + alias }

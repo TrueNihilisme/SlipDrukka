@@ -368,6 +368,10 @@ func ping(conn *agentConn) error {
 	}
 }
 
+// frameWait: how long one frame of a job (at most proto.MaxFrame bytes) may
+// take to leave for the shop.
+const frameWait = 2 * time.Minute
+
 // sendJob streams one spooled job and waits for the agent's confirmation.
 func (s *Server) sendJob(conn *agentConn, j *spoolJob, target string) error {
 	f, err := os.Open(s.jobData(j.ID))
@@ -380,7 +384,7 @@ func (s *Server) sendJob(conn *agentConn, j *spoolJob, target string) error {
 		return fmt.Errorf("канал: %w", err)
 	}
 	defer stream.Close()
-	stream.SetWriteDeadline(time.Now().Add(5 * time.Minute))
+	stream.SetWriteDeadline(time.Now().Add(frameWait))
 	s.mu.Lock()
 	keep := int(s.ttl() / time.Minute)
 	s.mu.Unlock()
@@ -391,6 +395,9 @@ func (s *Server) sendJob(conn *agentConn, j *spoolJob, target string) error {
 	for {
 		n, rerr := f.Read(buf)
 		if n > 0 {
+			// Per frame, not for the whole job: a large document over a slow
+			// line must be able to arrive, a stalled line must still give up.
+			stream.SetWriteDeadline(time.Now().Add(frameWait))
 			if err := proto.WriteFrame(stream, buf[:n]); err != nil {
 				return fmt.Errorf("передача: %w", err)
 			}
@@ -402,6 +409,7 @@ func (s *Server) sendJob(conn *agentConn, j *spoolJob, target string) error {
 			return rerr
 		}
 	}
+	stream.SetWriteDeadline(time.Now().Add(frameWait))
 	if err := proto.WriteFrame(stream, nil); err != nil {
 		return fmt.Errorf("передача: %w", err)
 	}

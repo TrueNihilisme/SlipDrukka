@@ -208,3 +208,38 @@ func TestDamagedCertificateStopsServer(t *testing.T) {
 		t.Fatalf("у журналі немає пояснення: %v", log.Lines())
 	}
 }
+
+// A WireGuard key file that is there but cannot be read stops the server;
+// the key is never replaced over it.
+func TestUnreadableWGKeyStopsServer(t *testing.T) {
+	_, dir := newGuardServer(t)
+	key := common.Join(dir, "wg.key")
+	if err := os.Remove(key); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(key, 0o700); err != nil { // reading a folder fails, and not with "no such file"
+		t.Fatal(err)
+	}
+	log := common.NewLogRing("", 10)
+	if _, err := New(dir, log, nopAdmin{}); err == nil {
+		t.Fatal("сервер запустився з нечитабельним ключем WireGuard")
+	}
+	if fi, err := os.Stat(key); err != nil || !fi.IsDir() {
+		t.Fatal("файл ключа WireGuard замінено")
+	}
+	if !strings.Contains(strings.Join(log.Lines(), "\n"), "wg.key") {
+		t.Fatalf("у журналі немає пояснення: %v", log.Lines())
+	}
+}
+
+// A name typed into the sign-in form cannot add lines to the log.
+func TestLogNameOneLine(t *testing.T) {
+	got := logName("admin\r\n2026-01-01 00:00:00 вхід у панель: root\u2028x")
+	if strings.ContainsAny(got, "\r\n\u2028") {
+		t.Fatalf("у назві лишився перехід рядка: %q", got)
+	}
+	long := logName(strings.Repeat("я", 500))
+	if n := len([]rune(long)); n != 65 {
+		t.Fatalf("довга назва: %d знаків, мало бути 64 і три крапки", n)
+	}
+}

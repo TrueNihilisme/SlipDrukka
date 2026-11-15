@@ -32,10 +32,18 @@ const (
 )
 
 // loadWGKey reads the server's WireGuard private key, creating it once.
+// loadWGKey reads the server's WireGuard key, making it on first use. Like
+// the certificate, it is made only when the file does not exist: a file that
+// is there but cannot be read (locked, damaged) is an error, not a reason to
+// replace the key shops already know.
 func loadWGKey(dir string) (wgtun.Key, error) {
 	path := common.Join(dir, "wg.key")
-	if b, err := os.ReadFile(path); err == nil {
+	b, err := os.ReadFile(path)
+	if err == nil {
 		return wgtun.ParseKey(string(b))
+	}
+	if !os.IsNotExist(err) {
+		return wgtun.Key{}, err
 	}
 	k, err := wgtun.NewPrivate()
 	if err != nil {

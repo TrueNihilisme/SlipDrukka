@@ -78,8 +78,11 @@ func (s *Server) routes() http.Handler {
 		}
 		if err := CheckLogin(in.User, in.Password); err != nil {
 			s.limiter.Fail(who)
-			s.Log.Printf("невдалий вхід у панель як «%s» (%s): %v", in.User, who, err)
-			s.record(r, in.User, "невдалий вхід", err.Error())
+			// The name is whatever was typed into the form: keep it from
+			// forging lines in the log.
+			shown := logName(in.User)
+			s.Log.Printf("невдалий вхід у панель як «%s» (%s): %v", shown, who, err)
+			s.record(r, shown, "невдалий вхід", err.Error())
 			common.JSONError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
@@ -515,4 +518,21 @@ func yesNo(b bool) string {
 		return "так"
 	}
 	return "ні"
+}
+
+// logName makes a name typed by a visitor safe to write to the log: one
+// line, at most 64 characters.
+func logName(s string) string {
+	out := make([]rune, 0, 65)
+	for _, r := range s {
+		if len(out) == 64 {
+			out = append(out, '…')
+			break
+		}
+		if r < 0x20 || r == 0x7f || r == 0x85 || r == 0x2028 || r == 0x2029 {
+			r = ' '
+		}
+		out = append(out, r)
+	}
+	return string(out)
 }
