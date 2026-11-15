@@ -31,7 +31,10 @@ and shared again, the number stays the same and the queues on the server keep
 working.
 
 One shop printer can have several printers on the server with different
-drivers — they all print to the same printer in the shop.
+drivers — they all print to the same printer in the shop. The panel creates
+the first one; more are added in Windows on the server, on the same port
+`SLIPDRUKKA_91xx`, and the panel shows them in the same row. This is how
+2-in-1 printers (receipt and label) are set up, see the README.
 
 **Security:** ports `127.0.0.1:91xx` accept data only from the Windows print
 spooler. A program that sends data to the port directly, bypassing the

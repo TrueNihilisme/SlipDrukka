@@ -138,6 +138,41 @@ This is not a Windows signature: Windows still shows "Unknown publisher".
 * Shop: Windows 10/11.
 * The model's driver for receipt printers installed on the server.
 
+## Receipt and label in one printer (2-in-1)
+
+Some printers print both receipts and labels (for example Xprinter XP-365B).
+The mode is switched on the printer itself, and according to the maker's
+manual each mode needs its own driver: the model's driver for labels and an
+80 mm receipt driver (XP-80, POS-80) for receipts.
+
+For SlipDrukka this is one shop printer and two printers on the server:
+
+1. Share the shop printer once, in "Receipt / label" mode.
+2. Create the first printer on the server in the panel ("Create printer on
+   the server") with one of the drivers. Name it so that the mode is clear:
+   "Station Receipt".
+3. Create the second one in Windows on the server: Printers → Add a printer
+   → Use an existing port → the port `SLIPDRUKKA_91xx` of this printer (the
+   panel shows its number) → the other driver → the name "Station Labels".
+   The panel shows both in the same row.
+4. In the program the cashier picks the printer that matches the mode the
+   printer itself is switched to.
+
+Worth knowing:
+
+* The program does not see which mode the printer is in and will not stop a
+  receipt sent while it is in label mode. Something printed in the wrong
+  mode comes out unreadable: switch the printer and print again.
+* The label size for all users of the server is set with the "paper size"
+  button next to the label printer
+  ([help](docs/en/server-printer.md#paper-size-for-everyone)). Writing the
+  size was measured with the Xprinter XP-365B, Xprinter XP-420B and ZDesigner
+  GK420d drivers; printing with that size was checked only with the XP-420B
+  driver.
+* Nothing extra is installed at the shop: the driver on the server draws
+  both the receipt and the label.
+* This setup has not been tried on a real 2-in-1 printer yet.
+
 ## Limits
 
 * All queued jobs together: up to 4 GB.
