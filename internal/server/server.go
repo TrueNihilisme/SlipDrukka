@@ -588,6 +588,11 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, rele
 	}
 	drop := func() { // banned address: silently
 		s.noteBannedHit(ip)
+		// The slot is given back before the connection is closed: a banned
+		// address has one slot, and a shop that comes straight back with a
+		// valid code must not find it still taken by the connection it has
+		// just seen closed.
+		finish()
 		c.Close()
 	}
 	var hello proto.Hello
