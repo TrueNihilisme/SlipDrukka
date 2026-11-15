@@ -381,7 +381,10 @@ func (s *Server) sendJob(conn *agentConn, j *spoolJob, target string) error {
 	}
 	defer stream.Close()
 	stream.SetWriteDeadline(time.Now().Add(5 * time.Minute))
-	if err := proto.WriteLine(stream, proto.JobHeader{ID: j.ID, Printer: target}); err != nil {
+	s.mu.Lock()
+	keep := int(s.ttl() / time.Minute)
+	s.mu.Unlock()
+	if err := proto.WriteLine(stream, proto.JobHeader{ID: j.ID, Printer: target, KeepMin: keep}); err != nil {
 		return err
 	}
 	buf := make([]byte, proto.MaxFrame)

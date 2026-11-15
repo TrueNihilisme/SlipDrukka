@@ -267,7 +267,7 @@ func (s *Sessions) Logout(w http.ResponseWriter, r *http.Request) {
 		delete(s.tokens, c.Value)
 		s.mu.Unlock()
 	}
-	http.SetCookie(w, &http.Cookie{Name: s.cookie, Value: "", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.cookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 }
 
 // DropAll ends every session (after a password change).

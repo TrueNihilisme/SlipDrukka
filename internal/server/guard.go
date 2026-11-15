@@ -11,7 +11,10 @@ package server
 //   - a blocked address is served only if it shows a valid code, which also
 //     lifts the block; anything else is closed silently;
 //   - connections that have not shown a code yet are limited per address and
-//     in total;
+//     in total; part of the total is kept for addresses of known shops, and
+//     connections through WireGuard have a total of their own;
+//   - failures, bans and these limits count an IPv6 /64 network as one
+//     address (guardKey);
 //   - a point seen from a new address raises an alert (or, with AutoPin, a
 //     point without addresses is tied to the first one);
 //   - a code nobody used expires after CodeTTLDays.
@@ -27,17 +30,36 @@ import (
 )
 
 const (
-	failMax        = 5
-	failWindow     = 10 * time.Minute
-	knownFor       = 30 * 24 * time.Hour
-	maxPendingIP   = 4
-	maxPendingAll  = 64
+	failMax       = 5
+	failWindow    = 10 * time.Minute
+	knownFor      = 30 * 24 * time.Hour
+	maxPendingIP  = 4
+	maxPendingAll = 64
+	// maxPendingNew: how many of the maxPendingAll slots addresses nobody
+	// knows may hold; the rest is kept for allowed addresses and addresses
+	// shops connected from, so strangers cannot keep shops from reconnecting.
+	maxPendingNew = 48
+	// maxPendingWG: slots for connections through WireGuard. Their own total:
+	// only a shop's key gets that far, and a full TCP total must not stop it.
+	maxPendingWG = 64
+	// knownRefresh: how often the "last seen" time of a known address is
+	// written to the config (it only feeds the knownFor limit).
+	knownRefresh   = time.Hour
 	maxBans        = 5000
 	maxAlerts      = 50
 	maxSeen        = 10
 	defaultBanH    = 120 // 5 days
 	defaultCodeD   = 7
 	foreverSetting = -1
+)
+
+// helloWait: how long an address nobody knows has to send its greeting;
+// known addresses, shops' WireGuard keys and everything after the greeting
+// get helloWaitKnown. A shop builds its greeting before it dials, so it has
+// nothing to wait for. (Variables: the tests shorten them.)
+var (
+	helloWait      = 5 * time.Second
+	helloWaitKnown = 20 * time.Second
 )
 
 // BanChoices and CodeChoices are what the settings page offers.
@@ -125,6 +147,59 @@ func (s *Server) codeExpiredLocked(a *AgentConfig, now time.Time) bool {
 	return !exp.IsZero() && now.After(exp)
 }
 
+// guardKey is what failures, bans, known addresses and handshake slots are
+// counted by: the address itself for IPv4, the /64 network for IPv6. One
+// subscriber owns a whole /64, so counting single addresses there would cost
+// an attacker nothing.
+func guardKey(ip netip.Addr) string {
+	ip = ip.Unmap().WithZone("")
+	if !ip.IsValid() || ip.Is4() {
+		return ip.String()
+	}
+	p, err := ip.Prefix(64)
+	if err != nil {
+		return ip.String()
+	}
+	return p.String()
+}
+
+// keyAddr turns a guardKey (or an address written by an older version) back
+// into an address inside it.
+func keyAddr(key string) (netip.Addr, bool) {
+	if p, err := netip.ParsePrefix(key); err == nil {
+		return p.Addr(), true
+	}
+	if a, err := netip.ParseAddr(key); err == nil {
+		return a.Unmap(), true
+	}
+	return netip.Addr{}, false
+}
+
+// rekeyGuardLocked moves bans and known addresses written by versions that
+// counted single IPv6 addresses to their /64 network.
+func (s *Server) rekeyGuardLocked() {
+	for k, b := range s.cfg.Bans {
+		if a, err := netip.ParseAddr(k); err == nil {
+			if nk := guardKey(a); nk != k {
+				if s.cfg.Bans[nk] == nil {
+					s.cfg.Bans[nk] = b
+				}
+				delete(s.cfg.Bans, k)
+			}
+		}
+	}
+	for k, t := range s.cfg.KnownIPs {
+		if a, err := netip.ParseAddr(k); err == nil {
+			if nk := guardKey(a); nk != k {
+				if t.After(s.cfg.KnownIPs[nk]) {
+					s.cfg.KnownIPs[nk] = t
+				}
+				delete(s.cfg.KnownIPs, k)
+			}
+		}
+	}
+}
+
 func contains(list []string, v string) bool {
 	for _, x := range list {
 		if x == v {
@@ -144,7 +219,7 @@ func (s *Server) exemptLocked(ip netip.Addr, now time.Time) bool {
 			return true
 		}
 	}
-	if t, ok := s.cfg.KnownIPs[ip.String()]; ok && now.Sub(t) < knownFor {
+	if t, ok := s.cfg.KnownIPs[guardKey(ip)]; ok && now.Sub(t) < knownFor {
 		return true
 	}
 	return false
@@ -170,12 +245,19 @@ func (s *Server) isBanned(ip netip.Addr) bool {
 	if s.exemptLocked(ip, now) {
 		return false
 	}
-	return s.banLocked(ip.String(), now) != nil || s.csBanned(ip)
+	return s.banLocked(guardKey(ip), now) != nil || s.csBanned(ip)
+}
+
+// exempt: see exemptLocked.
+func (s *Server) exempt(ip netip.Addr) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.exemptLocked(ip, time.Now())
 }
 
 func (s *Server) noteBannedHit(ip netip.Addr) {
 	s.mu.Lock()
-	if b := s.cfg.Bans[ip.String()]; b != nil {
+	if b := s.cfg.Bans[guardKey(ip)]; b != nil {
 		b.Hits++
 	}
 	s.mu.Unlock()
@@ -187,7 +269,7 @@ func (s *Server) noteFail(ip netip.Addr, reason string, code csFailCode) {
 	if !ip.IsValid() {
 		return
 	}
-	key := ip.String()
+	key := guardKey(ip)
 	now := time.Now()
 	s.mu.Lock()
 	if s.exemptLocked(ip, now) || s.banLocked(key, now) != nil {
@@ -242,7 +324,8 @@ func (s *Server) noteFail(ip netip.Addr, reason string, code csFailCode) {
 // becomes known (and unbanned), the code counts as used, a new address
 // raises an alert or, with AutoPin, ties the code to the first address.
 func (s *Server) noteGood(id string, ip netip.Addr) {
-	key := ip.String()
+	key := ip.String() // the point's address, as shown to the admin
+	gk := guardKey(ip) // what bans and known addresses are counted by
 	now := time.Now()
 	var logs []string
 	pinned := false
@@ -252,18 +335,30 @@ func (s *Server) noteGood(id string, ip netip.Addr) {
 		s.mu.Unlock()
 		return
 	}
+	// The config is written (and synced to the disk, under s.mu) only when
+	// something in it changed: after a server restart every shop reconnects
+	// at once, and a write per shop would hold up everything else.
+	changed := false
 	for k, t := range s.cfg.KnownIPs {
 		if now.Sub(t) > knownFor {
 			delete(s.cfg.KnownIPs, k)
+			changed = true
 		}
 	}
-	s.cfg.KnownIPs[key] = now
-	delete(s.fails, key)
-	if s.cfg.Bans[key] != nil {
-		delete(s.cfg.Bans, key)
-		logs = append(logs, fmt.Sprintf("адресу %s розблоковано: точка «%s» підключилась з дійсним кодом", key, a.Name))
+	if t, ok := s.cfg.KnownIPs[gk]; !ok || now.Sub(t) > knownRefresh {
+		s.cfg.KnownIPs[gk] = now
+		changed = true
 	}
-	a.CodeUsed = true
+	delete(s.fails, gk)
+	if s.cfg.Bans[gk] != nil {
+		delete(s.cfg.Bans, gk)
+		changed = true
+		logs = append(logs, fmt.Sprintf("адресу %s розблоковано: точка «%s» підключилась з дійсним кодом", gk, a.Name))
+	}
+	if !a.CodeUsed {
+		a.CodeUsed = true
+		changed = true
+	}
 	if !contains(a.Seen, key) {
 		switch {
 		case len(a.Seen) == 0 && s.cfg.AutoPin && len(a.AllowedIPs) == 0:
@@ -282,7 +377,8 @@ func (s *Server) noteGood(id string, ip netip.Addr) {
 		if len(a.Seen) > maxSeen {
 			a.Seen = a.Seen[len(a.Seen)-maxSeen:]
 		}
-	} else { // keep the latest address last
+		changed = true
+	} else if a.Seen[len(a.Seen)-1] != key { // keep the latest address last
 		out := a.Seen[:0]
 		for _, x := range a.Seen {
 			if x != key {
@@ -290,8 +386,12 @@ func (s *Server) noteGood(id string, ip netip.Addr) {
 			}
 		}
 		a.Seen = append(out, key)
+		changed = true
 	}
-	err := s.save()
+	var err error
+	if changed {
+		err = s.save()
+	}
 	s.mu.Unlock()
 	for _, l := range logs {
 		s.Log.Printf("%s", l)
@@ -317,24 +417,39 @@ func joinShort(list []string) string {
 
 // enterHandshake takes a slot for a connection that has not shown a code
 // yet; ok=false means the limit is reached and the connection is dropped.
+// Addresses nobody knows share maxPendingNew of the maxPendingAll slots.
 func (s *Server) enterHandshake(ip netip.Addr, banned bool) (release func(), ok bool) {
-	key := ip.String()
 	per := maxPendingIP
 	if banned {
 		per = 1
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.pendAll >= maxPendingAll || s.pending[key] >= per {
+	limit := maxPendingNew
+	if !banned && s.exemptLocked(ip, time.Now()) {
+		limit = maxPendingAll
+	}
+	return s.takeSlotLocked(s.pending, &s.pendAll, guardKey(ip), per, limit)
+}
+
+// enterHandshakeWG is enterHandshake for a connection through WireGuard.
+func (s *Server) enterHandshakeWG(ip netip.Addr) (release func(), ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.takeSlotLocked(s.pendingWG, &s.pendWG, guardKey(ip), maxPendingIP, maxPendingWG)
+}
+
+func (s *Server) takeSlotLocked(by map[string]int, all *int, key string, per, limit int) (release func(), ok bool) {
+	if *all >= limit || by[key] >= per {
 		return nil, false
 	}
-	s.pendAll++
-	s.pending[key]++
+	*all++
+	by[key]++
 	return func() {
 		s.mu.Lock()
-		s.pendAll--
-		if s.pending[key]--; s.pending[key] <= 0 {
-			delete(s.pending, key)
+		*all--
+		if by[key]--; by[key] <= 0 {
+			delete(by, key)
 		}
 		s.mu.Unlock()
 	}, true
@@ -352,13 +467,13 @@ func (s *Server) bansLocked(now time.Time) []BanView {
 	return out
 }
 
-// Unban lifts the block of one address.
+// Unban lifts the block of one address (or IPv6 /64 network).
 func (s *Server) Unban(ip string) error {
-	a, err := netip.ParseAddr(ip)
-	if err != nil {
+	a, ok := keyAddr(ip)
+	if !ok {
 		return errors.New("некоректна адреса")
 	}
-	key := a.Unmap().String()
+	key := guardKey(a)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.cfg.Bans[key] == nil {

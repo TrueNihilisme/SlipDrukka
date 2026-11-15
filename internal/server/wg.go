@@ -127,13 +127,13 @@ func (s *Server) acceptWG(wg *wgtun.Server, ln net.Listener) {
 			c.Close()
 			continue
 		}
-		release, ok := s.enterHandshake(ip, false)
+		release, ok := s.enterHandshakeWG(ip)
 		if !ok {
 			c.Close()
 			continue
 		}
 		tc := tls.Server(&viaConn{Conn: c, remote: ep}, s.tlsConfig())
-		go s.handleAgent(tc, ip, false, release, &pub)
+		go s.handleAgent(tc, ip, false, true, release, &pub)
 	}
 }
 

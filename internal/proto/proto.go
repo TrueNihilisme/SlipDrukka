@@ -214,6 +214,10 @@ type JobHeader struct {
 	Printer string          `json:"printer,omitempty"` // Windows printer name on the agent PC
 	Cmd     string          `json:"cmd,omitempty"`
 	Args    json.RawMessage `json:"args,omitempty"`
+	// KeepMin: for how many minutes the server may still re-send this job
+	// (its queue lifetime). The point remembers printed jobs at least that
+	// long, so a re-sent job is never printed twice (0.18.1).
+	KeepMin int `json:"keep_min,omitempty"`
 }
 
 type JobResult struct {

@@ -135,7 +135,7 @@ func (a *Agent) handleJob(st net.Conn) {
 		reply(proto.JobResult{Error: err.Error(), Bytes: total})
 		return
 	}
-	a.markDone(hdr.ID)
+	a.markDone(hdr.ID, time.Duration(hdr.KeepMin)*time.Minute)
 	how := "передано в чергу Windows"
 	if mode == proto.ModeXPS {
 		how = "документ надруковано драйвером цього ПК"
@@ -155,15 +155,24 @@ func (a *Agent) handleJob(st net.Conn) {
 // nothing at all although Windows reported the job as printed.
 var rawSafeV4 = map[string]bool{"Microsoft XPS Document Writer v4": true}
 
-// markDone remembers a printed job for two days, on disk, so a re-sent job
-// is recognised even after the agent restarts.
-func (a *Agent) markDone(id string) {
+// doneKeep: how long a printed job is remembered at least.
+const doneKeep = 48 * time.Hour
+
+// markDone remembers a printed job, on disk, so a re-sent job is recognised
+// even after the agent restarts. It is kept for two days, or for as long as
+// the server keeps jobs in its queue (serverKeep, from the job header) plus
+// an hour when that is longer: the server may re-send a job until then.
+func (a *Agent) markDone(id string, serverKeep time.Duration) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	keep := doneKeep
+	if serverKeep+time.Hour > keep {
+		keep = serverKeep + time.Hour
+	}
 	now := time.Now()
 	a.done[id] = now
 	for k, t := range a.done {
-		if now.Sub(t) > 48*time.Hour {
+		if now.Sub(t) > keep {
 			delete(a.done, k)
 		}
 	}

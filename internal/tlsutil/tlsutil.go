@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -21,14 +22,33 @@ import (
 )
 
 // LoadOrCreate returns the server certificate stored in dir, creating it on
-// first use. The certificate lives for 20 years: agents pin its fingerprint,
-// so rotating it means handing out new codes.
-func LoadOrCreate(dir string) (tls.Certificate, error) {
+// first use (created reports that). The certificate lives for 20 years:
+// agents pin its fingerprint, so rotating it means handing out new codes.
+//
+// A certificate is made only when neither file exists. If a file is there
+// but the pair cannot be read (damaged by a power cut, one file missing), it
+// is an error: a silently made new certificate would turn away every shop
+// at once, with nothing to show why.
+func LoadOrCreate(dir string) (cert tls.Certificate, created bool, err error) {
 	certPath := filepath.Join(dir, "server.crt")
 	keyPath := filepath.Join(dir, "server.key")
-	if c, err := tls.LoadX509KeyPair(certPath, keyPath); err == nil {
-		return c, nil
+	_, errC := os.Stat(certPath)
+	_, errK := os.Stat(keyPath)
+	if !(os.IsNotExist(errC) && os.IsNotExist(errK)) {
+		c, err := tls.LoadX509KeyPair(certPath, keyPath)
+		if err != nil {
+			return tls.Certificate{}, false, fmt.Errorf("%w: %v", ErrDamaged, err)
+		}
+		return c, false, nil
 	}
+	c, err := create(certPath, keyPath)
+	return c, err == nil, err
+}
+
+// ErrDamaged: the certificate files exist but cannot be used.
+var ErrDamaged = errors.New("tlsutil: server.crt / server.key cannot be read")
+
+func create(certPath, keyPath string) (tls.Certificate, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return tls.Certificate{}, err

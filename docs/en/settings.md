@@ -93,6 +93,8 @@ handshake, a foreign or expired code) is blocked.
 * The server does not answer a blocked address at all. But if a **valid**
   shop code comes from it, the block is lifted on its own: a shop that had an
   old code and has just been given a new one does not stand idle for days.
+* An IPv6 network (/64, what one subscriber gets) counts as one address and
+  is blocked as a whole; the list shows it as `2001:db8:1:2::/64`.
 * **How long to block:** 1 hour, 1 day, 5 days (default), 30 days or forever.
 * **How long a connection code is valid until used:** 1 day, 7 days
   (default), 30 days or no limit. Once a shop has connected, its code does not

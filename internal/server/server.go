@@ -196,9 +196,12 @@ type Server struct {
 
 	refused map[string]*refusedInfo // source IP -> refused connections
 	fails   map[string][]time.Time  // source IP -> recent failed connections
-	pending map[string]int          // source IP -> connections still in the handshake
+	pending map[string]int          // source (guardKey) -> connections still in the handshake
 	pendAll int                     // all connections still in the handshake
-	audit   *auditLog
+	// The same for connections through WireGuard (their own total).
+	pendingWG map[string]int
+	pendWG    int
+	audit     *auditLog
 
 	wgKey wgtun.Key     // server's WireGuard private key (wg.key)
 	wg    *wgtun.Server // nil when WireGuard is off
@@ -231,7 +234,7 @@ func New(dir string, log *common.LogRing, admin Admin) (*Server, error) {
 		stats: map[string]*printerStats{},
 		ctx:   context.Background(), jobs: map[string]*spoolJob{}, workers: map[string]chan struct{}{},
 		refused: map[string]*refusedInfo{}, events: map[string][]proto.Event{}, portless: map[string]bool{},
-		fails: map[string][]time.Time{}, pending: map[string]int{},
+		fails: map[string][]time.Time{}, pending: map[string]int{}, pendingWG: map[string]int{},
 	}
 	_, statErr := os.Stat(s.cfgPath())
 	if err := common.LoadJSON(s.cfgPath(), &s.cfg); err != nil {
@@ -258,11 +261,22 @@ func New(dir string, log *common.LogRing, admin Admin) (*Server, error) {
 	if s.cfg.Ports == nil {
 		s.cfg.Ports = map[string]int{}
 	}
-	cert, err := tlsutil.LoadOrCreate(dir)
+	cert, created, err := tlsutil.LoadOrCreate(dir)
 	if err != nil {
+		if errors.Is(err, tlsutil.ErrDamaged) {
+			// Written to the log too: a service that does not start shows nothing else.
+			log.Printf("ПОМИЛКА: сертифікат сервера пошкоджено (файли server.crt і server.key у теці %s), сервер не запускається. Поверніть обидва файли з копії. Якщо копії немає, видаліть обидва файли: сервер створить новий сертифікат, і кожному магазину треба буде видати новий код підключення", dir)
+		}
 		return nil, fmt.Errorf("сертифікат: %w", err)
 	}
 	s.cert = cert
+	if created {
+		if len(s.cfg.Agents) > 0 {
+			log.Printf("УВАГА: файлів сертифіката не було, створено новий сертифікат сервера (відбиток %s). Коди й ключі магазинів, видані раніше, більше не підходять: кожному магазину треба видати новий код підключення", tlsutil.Fingerprint(cert))
+		} else {
+			log.Printf("створено сертифікат сервера (відбиток %s)", tlsutil.Fingerprint(cert))
+		}
+	}
 	if s.wgKey, err = loadWGKey(dir); err != nil {
 		return nil, fmt.Errorf("ключ WireGuard: %w", err)
 	}
@@ -275,6 +289,7 @@ func New(dir string, log *common.LogRing, admin Admin) (*Server, error) {
 	if s.cfg.KnownIPs == nil {
 		s.cfg.KnownIPs = map[string]time.Time{}
 	}
+	s.rekeyGuardLocked()
 	s.audit = openAudit(dir)
 	s.limiter = common.NewLimiter(5, 5*time.Minute, time.Minute)
 	s.sessions = common.NewSessions("sd_srv", func() string {
@@ -433,7 +448,7 @@ func (s *Server) listenAgents(addr string) error {
 				c.Close()
 				continue
 			}
-			go s.handleAgent(c, ip, banned, release, nil)
+			go s.handleAgent(c, ip, banned, !banned && s.exempt(ip), release, nil)
 		}
 	}()
 	return nil
@@ -552,7 +567,9 @@ func yamuxConfig() *yamux.Config {
 // peer: the point's WireGuard key when the connection came through the
 // tunnel (nil for plain TCP). Such a point is already authenticated by
 // WireGuard, so its failures are not counted towards a ban.
-func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release func(), peer *wgtun.Key) {
+// known: the address is on an allow-list or a shop connected from it lately
+// (it gets more time for its greeting).
+func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned, known bool, release func(), peer *wgtun.Key) {
 	released := false
 	finish := func() {
 		if !released {
@@ -562,10 +579,11 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 	}
 	defer finish()
 	remote := c.RemoteAddr().String()
-	if banned {
-		c.SetDeadline(time.Now().Add(5 * time.Second))
+	// A connection that says nothing holds its slot only this long.
+	if known || peer != nil {
+		c.SetDeadline(time.Now().Add(helloWaitKnown))
 	} else {
-		c.SetDeadline(time.Now().Add(20 * time.Second))
+		c.SetDeadline(time.Now().Add(helloWait))
 	}
 	drop := func() { // banned address: silently
 		s.noteBannedHit(ip)
@@ -584,6 +602,9 @@ func (s *Server) handleAgent(c net.Conn, ip netip.Addr, banned bool, release fun
 		s.Log.Printf("точка %s: рукостискання не вдалося: %v", remote, err)
 		s.noteFail(ip, "обірване або некоректне рукостискання", csHandshake)
 		return
+	}
+	if !banned {
+		c.SetDeadline(time.Now().Add(helloWaitKnown)) // the greeting came; the rest is ours to do
 	}
 	refuse := func(msg string) {
 		proto.WriteLine(c, proto.Welcome{OK: false, Error: msg})

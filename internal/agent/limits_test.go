@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"slipdrukka/internal/common"
 	"slipdrukka/internal/proto"
@@ -94,5 +95,24 @@ func TestPanelAlwaysLoopback(t *testing.T) {
 	}
 	if a.WebAddr() != "127.0.0.1:7777" {
 		t.Fatalf("сторінка точки слухає %s", a.WebAddr())
+	}
+}
+
+// A printed job is remembered for two days, or for as long as the server may
+// still re-send it when that is longer.
+func TestDoneKeptAsLongAsServerQueue(t *testing.T) {
+	a := &Agent{dir: t.TempDir(), Log: common.NewLogRing("", 10), done: map[string]time.Time{}}
+	old := time.Now().Add(-72 * time.Hour)
+	a.done["old"] = old
+	a.markDone("a", 7*24*time.Hour)
+	if _, ok := a.done["old"]; !ok {
+		t.Fatal("завдання триденної давнини забуто, хоча сервер тримає чергу 7 діб")
+	}
+	a.markDone("b", time.Hour)
+	if _, ok := a.done["old"]; ok {
+		t.Fatal("завдання триденної давнини не забуто при черзі в годину")
+	}
+	if _, ok := a.done["a"]; !ok {
+		t.Fatal("свіже завдання забуто")
 	}
 }

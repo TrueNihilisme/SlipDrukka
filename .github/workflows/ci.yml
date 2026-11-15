@@ -34,8 +34,20 @@ jobs:
           go-version-file: go.mod
       - name: Test
         run: go test ./... -count=1 -timeout 10m
+      # WireGuard tunnel tests skip themselves under the race detector
+      # (KNOWN-ISSUES.md); everything else runs over plain TLS.
+      - name: Test with the race detector
+        run: go test -race ./... -count=1 -timeout 20m
+      - name: Vet (code built for other systems, used by the tests)
+        run: go vet ./...
       - name: Check that the Windows programs compile
         run: GOOS=windows GOARCH=amd64 go vet ./...
+      - name: Known vulnerabilities (the Windows programs and the test build)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          check="$(go env GOPATH)/bin/govulncheck"
+          GOOS=windows GOARCH=amd64 "$check" ./...
+          "$check" ./...
       - name: Install MSI tools
         run: sudo apt-get update && sudo apt-get install -y msitools wixl
       - name: Build

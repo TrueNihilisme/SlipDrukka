@@ -341,8 +341,8 @@ func (s *Server) dropDisallowed() {
 // unbanListedLocked lifts bans of addresses the admin has just allowed.
 func (s *Server) unbanListedLocked() {
 	for key := range s.cfg.Bans {
-		ip, err := netip.ParseAddr(key)
-		if err != nil {
+		ip, ok := keyAddr(key)
+		if !ok {
 			continue
 		}
 		listed := len(s.cfg.Allowed) > 0 && matches(s.cfg.Allowed, ip)

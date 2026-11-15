@@ -1,0 +1,12 @@
+# Actions are pinned to commit SHAs and Go modules to exact versions; without
+# this they would never move. Dependabot opens a pull request for each update.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly

@@ -41,8 +41,13 @@ A shop opens nothing to the internet: it connects to the server itself.
   limited to its own addresses.
 * **Ban after guessing.** 5 failed connections in 10 minutes block the
   address (default 5 days). Allowed addresses and addresses of shops seen
-  in the last 30 days are never banned. At most 4 unfinished handshakes per
-  address and 64 in total.
+  in the last 30 days are never banned. An IPv6 /64 network counts as one
+  address.
+* **Limits on unfinished connections.** At most 4 unfinished handshakes per
+  address and 64 in total; addresses nobody knows may hold 48 of them, the
+  rest is kept for allowed addresses and addresses of known shops.
+  Connections through WireGuard have a total of their own. An unknown
+  address that says nothing is dropped after 5 seconds.
 * **Alerts.** A shop connecting from a new address shows up in the panel.
   Every change made in the panel is written to audit.log.
 * **No administrator rights.** Both services run under their own Windows
@@ -87,6 +92,21 @@ A shop opens nothing to the internet: it connects to the server itself.
   a code or a shop computer may have been compromised, issue a new code in
   the panel (More → Issue a new connection code); the old key stops working
   at once.
+* **A shop's key in the wrong hands gets that shop's receipts.** A shop is
+  whoever connected last with its key: the earlier connection is closed and
+  print jobs go to the new one. Someone who copied the key from a shop
+  computer can connect as that shop, receive everything printed for it
+  (goods, prices, whatever else the receipt carries) and keep the real shop
+  from printing. The panel shows an alert when a shop connects from a new
+  address; it does not when the address is one the shop used before. Limit
+  the shop to its addresses, so the key is useless anywhere else. If a shop
+  computer may have been compromised, issue a new code: the old key stops
+  working at once.
+* **The server's certificate cannot be replaced without new codes.** Every
+  code and shop key is tied to it. Keep a copy of `server.crt` and
+  `server.key` from the server's data folder. If they are damaged the
+  server refuses to start and says so in its log; it does not make a new
+  certificate over them.
 * **The admin panel has no HTTPS.** On the server itself this does not
   matter; from the network, the emergency password travels in clear text,
   which is why that is off by default.
