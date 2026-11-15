@@ -151,10 +151,12 @@ For SlipDrukka this is one shop printer and two printers on the server:
 2. Create the first printer on the server in the panel ("Create printer on
    the server") with one of the drivers. Name it so that the mode is clear:
    "Station Receipt".
-3. Create the second one in Windows on the server: Printers → Add a printer
-   → Use an existing port → the port `SLIPDRUKKA_91xx` of this printer (the
-   panel shows its number) → the other driver → the name "Station Labels".
-   The panel shows both in the same row.
+3. Create the second one in the same place with "one more printer on the
+   server" under the first: the other driver, the name "Station Labels". The
+   panel shows both in the same row. (Release 0.19.0 does not have this
+   button yet: there the second printer is added in Windows on the server —
+   Add a printer → Use an existing port → the port `SLIPDRUKKA_91xx` of this
+   printer.)
 4. In the program the cashier picks the printer that matches the mode the
    printer itself is switched to.
 

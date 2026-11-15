@@ -593,7 +593,7 @@ function connCell(a,p){
 
 function rowHTML(a,ai,p,pi){
   const st=routeState(a,p),q=p.queues||[];
-  const srv=q.length?q.map((x,qi)=>`<div class="q"><span class="name">${esc(x.name)}</span> <button class="icon" title="Перейменувати принтер на сервері" data-act="qren" data-a="${ai}" data-p="${pi}" data-q="${qi}">✎</button><small>${esc(x.driver)}</small>${p.mode?'':`${x.paper?`<small>папір для всіх: ${x.paper.width/10} × ${x.paper.length/10} мм</small>`:''}<small><button class="quiet" style="padding:0" data-act="qpaper" data-a="${ai}" data-p="${pi}" data-q="${qi}">розмір паперу</button></small>`}</div>`).join('')
+  const srv=q.length?q.map((x,qi)=>`<div class="q"><span class="name">${esc(x.name)}</span> <button class="icon" title="Перейменувати принтер на сервері" data-act="qren" data-a="${ai}" data-p="${pi}" data-q="${qi}">✎</button><small>${esc(x.driver)}</small>${p.mode?'':`${x.paper?`<small>папір для всіх: ${x.paper.width/10} × ${x.paper.length/10} мм</small>`:''}<small><button class="quiet" style="padding:0" data-act="qpaper" data-a="${ai}" data-p="${pi}" data-q="${qi}">розмір паперу</button></small>`}</div>`).join('')+(p.offered&&a.online&&!p.mode?`<div class="q"><small><button class="quiet" style="padding:0" data-act="queue" data-a="${ai}" data-p="${pi}">ще один принтер на сервері</button></small></div>`:'')
     :(p.offered&&a.online?`<button data-act="queue" data-a="${ai}" data-p="${pi}">Створити принтер на сервері</button>`:'<span class="mute">—</span>');
   let shop;
   if(!p.offered)shop=`<span class="ink2">не видано</span><small>порт закріплено за ним, доки його не звільнять</small>`;
@@ -750,7 +750,8 @@ async function openQueue(a,p){
       ?'Режим «Документ»: на сервері ставиться Microsoft XPS Document Writer v4, а друкує рідний драйвер у магазині. Користувачі бачать лише назву.'
       :'Виберіть драйвер моделі принтера, встановлений на сервері. Саме він малює чек, QR-код і штрихкоди.'}
       Друкуватиме на «${esc(p.name)}» у магазині «${esc(a.name)}».</p>
-    <label class="f" for="qName">Назва, яку бачитимуть програми</label><input id="qName" value="${esc(a.name+' '+p.name)}" style="width:100%">
+    ${(p.queues||[]).length?'<p class="ink2">У цього принтера вже є принтер на сервері. Ще один з іншим драйвером потрібен, наприклад, принтеру «2 в 1»: один для чеків, другий для етикеток.</p>':''}
+    <label class="f" for="qName">Назва, яку бачитимуть програми</label><input id="qName" value="${esc(a.name+' '+p.name+((p.queues||[]).length?' '+((p.queues||[]).length+1):''))}" style="width:100%">
     <label class="f" for="qDriver">Драйвер на сервері</label><select id="qDriver" style="width:100%"><option>завантаження…</option></select>
     <div class="row actions" style="margin-top:16px"><button class="primary" id="qGo">Створити принтер</button><button onclick="closeModal()">Скасувати</button><span id="qMsg"></span></div>`);
   try{if(!serverDrivers)serverDrivers=await api('GET','/api/drivers')}catch(e){flash('qMsg',false,e.message);return}
