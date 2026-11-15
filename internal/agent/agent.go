@@ -83,6 +83,7 @@ type Agent struct {
 	missing       map[string]bool // aliases already reported missing
 	fallbackNoted map[string]bool // alias|reason already reported (fallback.go)
 	dirty         chan struct{}   // ask the watcher to re-check and push
+	invHidden     int             // printers left out of the last report (fitInventory)
 	ports         portCache
 	wgFailedAt    time.Time    // WireGuard did not work: plain TLS until wgRetry passes
 	wgFails       int          // WireGuard failures in a row (wgDelayLocked)

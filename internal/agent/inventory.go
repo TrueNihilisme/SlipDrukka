@@ -91,7 +91,43 @@ func (a *Agent) inventory() *proto.Inventory {
 	inv.Events = append([]proto.Event(nil), a.events...)
 	a.mu.Unlock()
 	inv.Net = a.netInfo()
+	a.fitInventory(inv)
 	return inv
+}
+
+// maxInventory: the report travels to the server as part of one protocol
+// line (proto.MaxLine, with the greeting around it at connection time). A
+// longer line is refused, and a point that sent one could never connect.
+const maxInventory = 40 * 1024
+
+// fitInventory shortens the list of the computer's printers until the report
+// fits. Printers shared with the server go first and are kept; the rest of
+// the list is only what the panel offers to add.
+func (a *Agent) fitInventory(inv *proto.Inventory) {
+	size := func() int { b, _ := json.Marshal(inv); return len(b) }
+	total := len(inv.Printers)
+	if size() > maxInventory {
+		shared := map[string]bool{}
+		for _, p := range inv.Shared {
+			shared[p.Name] = true
+		}
+		sort.SliceStable(inv.Printers, func(i, j int) bool { return shared[inv.Printers[i].Name] && !shared[inv.Printers[j].Name] })
+		for len(inv.Printers) > 0 && size() > maxInventory {
+			cut := len(inv.Printers) / 10
+			if cut == 0 {
+				cut = 1
+			}
+			inv.Printers = inv.Printers[:len(inv.Printers)-cut]
+		}
+	}
+	hidden := total - len(inv.Printers)
+	a.mu.Lock()
+	changed := hidden != a.invHidden
+	a.invHidden = hidden
+	a.mu.Unlock()
+	if changed && hidden > 0 {
+		a.Log.Printf("УВАГА: у Windows цього комп'ютера %d принтерів, звіт для сервера вміщує %d: решти %d сервер не бачить і додати їх з панелі не можна", total, len(inv.Printers), hidden)
+	}
 }
 
 func (a *Agent) addEvent(level, kind, printer, text string) {

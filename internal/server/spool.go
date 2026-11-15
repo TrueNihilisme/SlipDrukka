@@ -230,27 +230,33 @@ func (s *Server) agentNameLocked(id string) string {
 // wake makes sure a delivery worker for the point is running and nudges it.
 func (s *Server) wake(agentID string) {
 	s.mu.Lock()
-	ch, ok := s.workers[agentID]
+	w, ok := s.workers[agentID]
 	if !ok {
-		ch = make(chan struct{}, 1)
-		s.workers[agentID] = ch
-		go s.deliverLoop(s.ctx, agentID, ch)
+		w = &deliverWorker{wake: make(chan struct{}, 1), stop: make(chan struct{})}
+		s.workers[agentID] = w
+		go s.deliverLoop(s.ctx, agentID, w)
 	}
 	s.mu.Unlock()
 	select {
-	case ch <- struct{}{}:
+	case w.wake <- struct{}{}:
 	default:
 	}
 }
 
-func (s *Server) deliverLoop(ctx context.Context, agentID string, wake chan struct{}) {
+// deliverWorker: wake nudges the point's delivery loop, stop (closed when
+// the point is deleted) ends it.
+type deliverWorker struct{ wake, stop chan struct{} }
+
+func (s *Server) deliverLoop(ctx context.Context, agentID string, w *deliverWorker) {
 	tick := time.NewTicker(retryDelay)
 	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-wake:
+		case <-w.stop:
+			return
+		case <-w.wake:
 		case <-tick.C:
 		}
 		s.deliverPending(agentID)

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -114,5 +115,48 @@ func TestDoneKeptAsLongAsServerQueue(t *testing.T) {
 	}
 	if _, ok := a.done["a"]; !ok {
 		t.Fatal("свіже завдання забуто")
+	}
+}
+
+// A computer with more printers than one protocol line can carry still
+// reports: the list is cut to fit, printers shared with the server stay in
+// it, and the log says what happened.
+func TestInventoryFitsProtocolLine(t *testing.T) {
+	var list []winprint.PrinterInfo
+	for i := 0; i < 3000; i++ {
+		n := "Принтер відділу " + strings.Repeat("я", 20) + " " + strconv.Itoa(i)
+		list = append(list, winprint.PrinterInfo{Name: n, Driver: "Драйвер моделі " + strconv.Itoa(i%7), Port: "IP_10.0.0." + strconv.Itoa(i%250)})
+	}
+	log := common.NewLogRing("", 10)
+	a, err := New(t.TempDir(), log, &winprint.Fake{Printers: list})
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := list[len(list)-1].Name
+	a.cfg.Shared = []proto.Printer{{Name: last, Alias: "last"}}
+	inv := a.inventory()
+	b, _ := json.Marshal(proto.Hello{Proto: proto.Version, Key: strings.Repeat("k", 64), Hostname: "shop", Printers: inv.Shared, Inventory: inv})
+	if len(b) > proto.MaxLine {
+		t.Fatalf("привітання %d байт, межа рядка %d", len(b), proto.MaxLine)
+	}
+	if len(inv.Printers) == 0 || len(inv.Printers) >= len(list) {
+		t.Fatalf("у звіті %d принтерів із %d", len(inv.Printers), len(list))
+	}
+	found := false
+	for _, p := range inv.Printers {
+		if p.Name == last {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("виданий серверу принтер випав зі звіту")
+	}
+	if !strings.Contains(strings.Join(log.Lines(), "\n"), "звіт для сервера вміщує") {
+		t.Fatalf("у журналі немає попередження: %v", log.Lines())
+	}
+	// A short list is sent whole.
+	a2, _ := New(t.TempDir(), common.NewLogRing("", 10), &winprint.Fake{Printers: list[:5]})
+	if n := len(a2.inventory().Printers); n != 5 {
+		t.Fatalf("короткий список: %d із 5", n)
 	}
 }

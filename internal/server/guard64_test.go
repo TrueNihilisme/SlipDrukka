@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"slipdrukka/internal/common"
+	"slipdrukka/internal/proto"
 )
 
 // IPv6: failures, bans and handshake slots count a /64 network as one
@@ -241,5 +242,34 @@ func TestLogNameOneLine(t *testing.T) {
 	long := logName(strings.Repeat("я", 500))
 	if n := len([]rune(long)); n != 65 {
 		t.Fatalf("довга назва: %d знаків, мало бути 64 і три крапки", n)
+	}
+}
+
+// Deleting a point also ends its delivery worker and drops what the server
+// kept for it.
+func TestDeleteAgentCleansUp(t *testing.T) {
+	s, _ := newGuardServer(t)
+	id, _ := addPoint(t, s, "Каса")
+	s.wake(id)
+	s.mu.Lock()
+	w := s.workers[id]
+	s.events[id] = []proto.Event{{Kind: "missing"}}
+	s.stats[portKey(id, "p")] = &printerStats{}
+	s.mu.Unlock()
+	if w == nil {
+		t.Fatal("робочий цикл доставки не створено")
+	}
+	if err := s.DeleteAgent(id); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-w.stop:
+	default:
+		t.Fatal("робочий цикл доставки не зупинено")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.workers) != 0 || len(s.events) != 0 || len(s.stats) != 0 {
+		t.Fatalf("лишилось: цикли %d, події %d, лічильники %d", len(s.workers), len(s.events), len(s.stats))
 	}
 }

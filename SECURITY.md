@@ -62,7 +62,7 @@ A shop opens nothing to the internet: it connects to the server itself.
   emergency password is accepted from other computers only when Settings
   allow it (off by default). The panel sends a Content-Security-Policy and
   refuses requests from other sites. The shop page has no password, so it
-  cannot replace a working connection code.
+  cannot replace a working connection code (see below for when it can).
 * **Releases** are built by GitHub Actions from the tag, with actions pinned
   to commit SHAs; only the release step, run for tags, may write to the
   repository. From 0.18.0 it signs the installers with Sigstore.
@@ -107,6 +107,13 @@ A shop opens nothing to the internet: it connects to the server itself.
   `server.key` from the server's data folder. If they are damaged the
   server refuses to start and says so in its log; it does not make a new
   certificate over them.
+* **The shop page takes a new code after any refusal by the server.** The
+  page has no password. It accepts a connection code when the shop has none
+  or when the server refused the current one, and the server refuses for
+  several reasons: the shop was removed, its code was re-issued or expired,
+  its address is not allowed, the program is too old. In each of those
+  moments anyone at the shop computer can enter a code, including a code
+  from another server, and the shop program will then connect there.
 * **The admin panel has no HTTPS.** On the server itself this does not
   matter; from the network, the emergency password travels in clear text,
   which is why that is off by default.

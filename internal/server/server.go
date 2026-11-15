@@ -221,9 +221,9 @@ type Server struct {
 	arriving map[string]map[int64]time.Time
 
 	ctx     context.Context
-	jobs    map[string]*spoolJob     // queued jobs by ID
-	seq     int64                    // arrival order
-	workers map[string]chan struct{} // delivery worker per point
+	jobs    map[string]*spoolJob      // queued jobs by ID
+	seq     int64                     // arrival order
+	workers map[string]*deliverWorker // delivery worker per point
 }
 
 // New loads (or creates) the config in dir.
@@ -232,7 +232,7 @@ func New(dir string, log *common.LogRing, admin Admin) (*Server, error) {
 		dir: dir, Log: log, admin: admin,
 		online: map[string]*agentConn{}, listeners: map[string]net.Listener{},
 		stats: map[string]*printerStats{},
-		ctx:   context.Background(), jobs: map[string]*spoolJob{}, workers: map[string]chan struct{}{},
+		ctx:   context.Background(), jobs: map[string]*spoolJob{}, workers: map[string]*deliverWorker{},
 		refused: map[string]*refusedInfo{}, events: map[string][]proto.Event{}, portless: map[string]bool{},
 		fails: map[string][]time.Time{}, pending: map[string]int{}, pendingWG: map[string]int{},
 	}
@@ -981,6 +981,23 @@ func (s *Server) DeleteAgent(id string) error {
 	}
 	if c := s.online[id]; c != nil {
 		c.sess.Close()
+	}
+	// What the server kept for the point goes with it: its delivery worker
+	// (it would wake up every few seconds for nothing), events, counters.
+	if w := s.workers[id]; w != nil {
+		close(w.stop)
+		delete(s.workers, id)
+	}
+	delete(s.events, id)
+	for key := range s.stats {
+		if strings.HasPrefix(key, id+"/") {
+			delete(s.stats, key)
+		}
+	}
+	for key := range s.portless {
+		if strings.HasPrefix(key, id+"/") {
+			delete(s.portless, key)
+		}
 	}
 	for jid, j := range s.jobs {
 		if j.AgentID == id {

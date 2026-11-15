@@ -31,7 +31,10 @@ func (w *WebServer) Start(addr string) error {
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Handler: w.handler, ReadHeaderTimeout: 10 * time.Second}
+	// No WriteTimeout: a command to a shop (creating a printer, a network
+	// check) is answered only when the shop has finished.
+	srv := &http.Server{Handler: w.handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second,
+		IdleTimeout: 2 * time.Minute, MaxHeaderBytes: 64 << 10}
 	go srv.Serve(l)
 	w.mu.Lock()
 	old := w.srv

@@ -3,6 +3,7 @@
 package common
 
 import (
+	"bytes"
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
@@ -161,7 +162,15 @@ func (l *LogRing) Printf(format string, args ...any) {
 	}
 	if st, err := os.Stat(l.path); err == nil && st.Size() > maxFile {
 		if b, err := os.ReadFile(l.path); err == nil {
-			_ = os.WriteFile(l.path, b[len(b)/2:], 0o600)
+			// Keep the newer half, from the start of a line, and swap it in
+			// whole: a crash in between leaves the old file, not a torn one.
+			keep := b[len(b)/2:]
+			if i := bytes.IndexByte(keep, '\n'); i >= 0 {
+				keep = keep[i+1:]
+			}
+			if os.WriteFile(l.path+".tmp", keep, 0o600) == nil {
+				_ = os.Rename(l.path+".tmp", l.path)
+			}
 		}
 	}
 	if f, err := os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
