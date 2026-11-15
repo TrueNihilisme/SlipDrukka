@@ -33,8 +33,8 @@ working.
 One shop printer can have several printers on the server with different
 drivers — they all print to the same printer in the shop. The next one is
 added with "one more printer on the server" under those already there
-(release 0.19.0 does not have the button yet: there, in Windows on the
-server, on the same port `SLIPDRUKKA_91xx`). This is how 2-in-1 printers
+(from 0.19.1; in older versions, in Windows on the server, on the same port
+`SLIPDRUKKA_91xx`). This is how 2-in-1 printers
 (receipt and label) are set up, see the README.
 
 **Security:** ports `127.0.0.1:91xx` accept data only from the Windows print
